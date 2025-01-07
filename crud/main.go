@@ -31,14 +31,39 @@ func initDB() {
 	db.AutoMigrate(&Product{})
 }
 
+// create product
+func createProduct(c *gin.Context) {
+	var product Product
+	if err := c.ShouldBindJSON(&product); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if result := db.Create(&product); result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, product)
+}
+
+// get products
+func getProducts(c *gin.Context){
+    var products []Product
+    if result := db.Find(&products); result.Error != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+    }
+
+    c.JSON(http.StatusOK, products)
+}
+
 func main() {
 	initDB()
 
 	r := gin.Default()
 
-	r.GET("/", func(ctx *gin.Context) {
-		ctx.JSON(http.StatusOK, gin.H{"message": "Welcome to gin"})
-	})
+	r.POST("/products", createProduct)
+	r.GET("/products", getProducts)
 
 	r.Run(":8080")
 }
