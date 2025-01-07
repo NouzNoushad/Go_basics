@@ -1,49 +1,58 @@
 package main
 
 import (
-	"cmp"
+	"encoding/json"
 	"fmt"
-	"slices"
 )
 
 type Product struct {
-	name string
-	price float64
-	date string
+	Name   string  `json:"name"`
+	Price  float64 `json:"price"`
+	InSale bool    `json:"inSale"`
 }
 
 func main() {
-
-	products := []Product {
+	// JSON
+	products := []Product{
 		{
-			name: "samsung",
-			price: 20,
-			date: "2025-02-12",
+			Name:   "samsung",
+			Price:  20.5,
+			InSale: false,
 		},
 		{
-			name: "oppo",
-			price: 22,
-			date: "2025-04-02",
+			Name:   "redmi",
+			Price:  22.5,
+			InSale: true,
 		},
 		{
-			name: "redmi",
-			price: 21,
-			date: "2020-02-12",
+			Name:   "nokia",
+			Price:  25.5,
+			InSale: true,
 		},
 		{
-			name: "nokia",
-			price: 23,
-			date: "2022-10-03",
+			Name:   "oppo",
+			Price:  21.5,
+			InSale: false,
 		},
 	}
-	
-	slices.SortFunc(products, func(a, b Product) int {
-		return cmp.Compare(b.date, a.date)
-	})
 
-	numbers := []int {2, 4, 8, 10, 5, 7, 1}
-	slices.Sort(numbers)
+	// convert data to json
+	jsonData, err := json.Marshal(products)
+	if err != nil {
+		fmt.Println("Error: ", err)
+		return
+	}
 
-	fmt.Println(products)
-	fmt.Println(numbers)
+	productsList := string(jsonData)
+	fmt.Println(productsList)
+
+	var p []Product
+
+	// convert json to data
+	error := json.Unmarshal([]byte(productsList), &p)
+	if error != nil {
+		fmt.Println("Error", error)
+	}
+
+	fmt.Println(p[3].Price)
 }
