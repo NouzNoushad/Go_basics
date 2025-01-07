@@ -1,4 +1,4 @@
-module crud
+module gobasics
 
 go 1.23.3
 
