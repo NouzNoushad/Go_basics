@@ -31,7 +31,7 @@ func CreateTodo(c *gin.Context) {
 func GetTodos(c *gin.Context) {
 	var todos []models.Todo
 
-	if result := config.DB.Find(&todos); result.Error != nil {
+	if result := config.DB.Order("updated_at desc").Find(&todos); result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
 		return
 	}
@@ -66,7 +66,7 @@ func UpdateTodo(c *gin.Context) {
 	if result := config.DB.First(&todo, id); result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Todo not found!"})
-		}else{
+		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
 		}
 		return
@@ -75,7 +75,7 @@ func UpdateTodo(c *gin.Context) {
 	if err := c.ShouldBindJSON(&todo); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
-	} 
+	}
 
 	if result := config.DB.Save(&todo); result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
