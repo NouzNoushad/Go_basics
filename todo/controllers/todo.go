@@ -105,5 +105,5 @@ func DeleteTodo(c *gin.Context) {
 		return
 	}
 
-	c.Status(http.StatusNoContent)
+	c.JSON(http.StatusOK, todo)
 }
