@@ -1,8 +1,8 @@
 package main
 
 import (
-	"gobasics/todo/config"
-	"gobasics/todo/controllers"
+	"gobasics/config"
+	"gobasics/controllers"
 
 	"github.com/gin-gonic/gin"
 )

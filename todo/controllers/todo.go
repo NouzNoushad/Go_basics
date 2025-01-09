@@ -2,8 +2,8 @@ package controllers
 
 import (
 	"fmt"
-	"gobasics/todo/config"
-	"gobasics/todo/models"
+	"gobasics/config"
+	"gobasics/models"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

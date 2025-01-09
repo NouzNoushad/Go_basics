@@ -2,8 +2,7 @@ package config
 
 import (
 	"fmt"
-
-	"gobasics/todo/models"
+	"gobasics/models"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
