@@ -3,6 +3,7 @@ package main
 import (
 	"user/config"
 	"user/controllers"
+	"user/middleware"
 
 	"github.com/gin-gonic/gin"
 )
@@ -14,10 +15,10 @@ func main() {
 
 	r.POST("/signup", controllers.SignUp)
 	r.POST("/login", controllers.Login)
-	
-	r.GET("/", func(ctx *gin.Context) {
-		ctx.JSON(200, gin.H{
-			"message": "Welcome to GO",
+
+	r.GET("/home", middleware.Authenticate(), func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"message": "Welcome to Home page",
 		})
 	})
 
