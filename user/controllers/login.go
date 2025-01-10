@@ -24,8 +24,16 @@ func Login(c *gin.Context) {
 	var userInput models.User
 	var user models.User
 
-	if err := c.ShouldBindJSON(&userInput); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+	// if err := c.ShouldBindJSON(&userInput); err != nil {
+	// 	c.JSON(400, gin.H{"error": err.Error()})
+	// 	return
+	// }
+
+	userInput.Email = c.PostForm("email")
+	userInput.Password = c.PostForm("password")
+
+	if userInput.Email == "" || userInput.Password == "" {
+		c.JSON(400, gin.H{"error": "All fields are required"})
 		return
 	}
 

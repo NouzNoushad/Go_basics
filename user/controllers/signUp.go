@@ -13,8 +13,17 @@ import (
 func SignUp(c *gin.Context) {
 	var user models.User
 
-	if err := c.ShouldBindJSON(&user); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+	// if err := c.ShouldBind(&user); err != nil {
+	// 	c.JSON(400, gin.H{"error": err.Error()})
+	// 	return
+	// }
+
+	user.Name = c.PostForm("name")
+	user.Email = c.PostForm("email")
+	user.Password = c.PostForm("password")
+
+	if user.Name == "" || user.Email == "" || user.Password == "" {
+		c.JSON(400, gin.H{"error": "All fields are required"})
 		return
 	}
 
