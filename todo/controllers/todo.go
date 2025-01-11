@@ -31,7 +31,7 @@ func CreateTodo(c *gin.Context) {
 func GetTodos(c *gin.Context) {
 	var todos []models.Todo
 
-	if result := config.DB.Order("updated_at desc").Find(&todos); result.Error != nil {
+	if result := config.DB.Order("created_at desc").Find(&todos); result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
 		return
 	}
