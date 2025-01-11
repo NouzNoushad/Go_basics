@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"img_upload/config"
 	"img_upload/models"
 	"net/http"
@@ -57,6 +58,27 @@ func UploadImage(c *gin.Context) {
 }
 
 // get uploads
-func GetUploads() {
-	
+func GetUploads(c *gin.Context) {
+	var uploads []models.Upload
+
+	if err := config.DB.Order("created_at desc").Find(&uploads).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"items": fmt.Sprintf("%d items", len(uploads)), "data": uploads})
+}
+
+// get upload by id
+func GetUploadById(c *gin.Context) {
+
+	id := c.Param("id")
+	var upload models.Upload
+
+	if err := config.DB.Where("id = ?", id).First(&upload).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": upload})
 }
