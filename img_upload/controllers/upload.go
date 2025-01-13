@@ -105,3 +105,49 @@ func DeleteUpload(c *gin.Context) {
 
     c.JSON(http.StatusOK, gin.H{"message": "Upload deleted"})
 }
+
+// update upload
+func UpdateUpload(c *gin.Context) {
+    id := c.Param("id")
+    var upload models.Upload
+
+    if err := config.DB.Where("id = ?", id).First(&upload).Error; err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Upload not found"})
+        return
+    }
+
+    descripton := c.PostForm("description")
+    if descripton != "" {
+        upload.Description = descripton
+    }
+
+    file, err := c.FormFile("image")
+    if err == nil {
+        // remove old file
+        if err := os.Remove(upload.Image.FilePath); err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete old file"})
+            return
+        }
+
+        // save new file
+        uploadDir := "uploads"
+        filePath := filepath.Join(uploadDir, file.Filename)
+        if err := c.SaveUploadedFile(file, filePath); err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save new file"})
+            return
+        }
+
+        // update file
+        upload.Image = models.Image{
+            Filename: file.Filename,
+            FilePath: filePath,
+        }
+    }
+
+    if err := config.DB.Save(&upload).Error; err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"message": "Upload updated", "data": upload})
+}
