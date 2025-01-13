@@ -12,6 +12,8 @@ func main() {
 
 	r := gin.Default()
 
+	r.Static("/uploads", "./uploads")
+
 	r.POST("/upload_image", controllers.UploadImage)
 	r.GET("/get_uploads", controllers.GetUploads)
 	r.GET("/get_upload/:id", controllers.GetUploadById)
