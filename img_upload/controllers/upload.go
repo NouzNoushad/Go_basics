@@ -82,3 +82,26 @@ func GetUploadById(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"data": upload})
 }
+
+// delete upload
+func DeleteUpload(c *gin.Context) {
+    id := c.Param("id")
+    var upload models.Upload
+
+    if err := config.DB.Where("id = ?", id).First(&upload).Error; err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Upload not found"})
+        return
+    }
+
+    if err := os.Remove(upload.Image.FilePath); err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete file from server"})
+        return
+    }
+
+    if err := config.DB.Delete(&upload).Error; err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"message": "Upload deleted"})
+}
