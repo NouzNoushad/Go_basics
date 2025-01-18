@@ -48,7 +48,7 @@ func CreateTask(c *gin.Context) {
 	startDate := c.PostForm("start_date")
 	dueDate := c.PostForm("due_date")
 
-	const dateLayout = "02-01-2006"
+	const dateLayout = "02/01/2006"
 	startDateParsed, err := time.Parse(dateLayout, startDate)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid start date format"})
@@ -158,7 +158,7 @@ func UpdateTaskDetails(c *gin.Context) {
 		task.Category = category
 	}
 
-	const dateLayout = "02-01-2006"
+	const dateLayout = "02/01/2006"
 
 	startDate := c.PostForm("start_date")
 	if startDate != "" {
