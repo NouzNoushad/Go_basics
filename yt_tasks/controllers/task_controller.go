@@ -123,6 +123,100 @@ func GetTaskDetails(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": task})
 }
 
+// update task
+func UpdateTaskDetails(c *gin.Context) {
+	id := c.Param("id")
+	var task models.Task
+
+	if err := config.DB.Where("id = ?", id).First(&task).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+
+	taskName := c.PostForm("name")
+	if taskName != "" {
+		task.Name = taskName
+	}
+
+	taskDescription := c.PostForm("description")
+	if taskDescription != "" {
+		task.Description = taskDescription
+	}
+
+	category := c.PostForm("category")
+	if category != "" {
+		if !isValidCategory(category) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid category"})
+			return
+		}
+		task.Cateogry = category
+	}
+
+	priority := c.PostForm("priority")
+	if priority != "" {
+		if !isValidPriority(priority) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid priority"})
+			return
+		}
+		task.Priority = priority
+	}
+
+	status := c.PostForm("status")
+	if status != "" {
+		if !isValidStatus(status) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid status"})
+			return
+		}
+		task.Status = status
+	}
+
+	const dateLayout = "02/01/2006"
+	dueDate := c.PostForm("due_date")
+	if dueDate != "" {
+		dueDateParsed, err := time.Parse(dateLayout, dueDate)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid due date"})
+			return
+		}
+		task.DueDate = dueDateParsed
+	}
+
+	username := c.PostForm("username")
+	if username != "" {
+		task.Assignee.Username = username
+	}
+
+	file, err := c.FormFile("image")
+	if err == nil {
+		// remove old file
+		if err := os.Remove(task.Assignee.Image.FilePath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete old image"})
+			return
+		}
+
+		// save new file
+		uploadDir := "uploads"
+		filePath := filepath.Join(uploadDir, file.Filename)
+		if err := c.SaveUploadedFile(file, filePath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save new file"})
+			return
+		}
+
+		task.Assignee.Image = models.Image{
+			Filename: file.Filename,
+			FilePath: filePath,
+		}
+	}
+
+	// update task
+	if err := config.DB.Save(&task).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Task updated", "data": task})
+}
+
 // delete task
 func DeleteTaskDetails(c *gin.Context) {
 	id := c.Param("id")
@@ -133,11 +227,11 @@ func DeleteTaskDetails(c *gin.Context) {
 		return
 	}
 
-    // remove assignee image from server
-    if err := os.Remove(task.Assignee.Image.FilePath); err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete image from server"})
-        return
-    } 
+	// remove assignee image from server
+	if err := os.Remove(task.Assignee.Image.FilePath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete image from server"})
+		return
+	}
 
 	if err := config.DB.Delete(&task).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
