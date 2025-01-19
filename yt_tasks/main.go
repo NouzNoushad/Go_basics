@@ -1,7 +1,6 @@
 package main
 
 import (
-	"net/http"
 	"yt_tasks/config"
 	"yt_tasks/controllers"
 
@@ -14,9 +13,9 @@ func main() {
 	r := gin.Default()
 
 	r.POST("/create_task", controllers.CreateTask)
-	r.GET("/", func(ctx *gin.Context) {
-		ctx.JSON(http.StatusOK, gin.H{"message": "Welcome to yt tasks"})
-	})
+	r.GET("/get_tasks", controllers.GetTasks)
+	r.GET("/task_details/:id", controllers.GetTaskDetails)
+	r.DELETE("/delete_task_details/:id", controllers.DeleteTaskDetails)
 
 	r.Run(":8020")
 }

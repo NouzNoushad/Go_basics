@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -94,5 +95,54 @@ func CreateTask(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "New task created"})
+	c.JSON(http.StatusOK, gin.H{"message": "New task created", "data": task})
+}
+
+// get tasks
+func GetTasks(c *gin.Context) {
+	var tasks []models.Task
+
+	if err := config.DB.Order("created_at desc").Find(&tasks).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"items": fmt.Sprintf("%d items", len(tasks)), "data": tasks})
+}
+
+// get task by id
+func GetTaskDetails(c *gin.Context) {
+	id := c.Param("id")
+	var task models.Task
+
+	if err := config.DB.Where("id = ?", id).First(&task).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": task})
+}
+
+// delete task
+func DeleteTaskDetails(c *gin.Context) {
+	id := c.Param("id")
+	var task models.Task
+
+	if err := config.DB.Where("id = ?", id).First(&task).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+
+    // remove assignee image from server
+    if err := os.Remove(task.Assignee.Image.FilePath); err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete image from server"})
+        return
+    } 
+
+	if err := config.DB.Delete(&task).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Task deleted"})
 }
