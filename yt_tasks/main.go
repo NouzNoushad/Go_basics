@@ -12,6 +12,8 @@ func main() {
 
 	r := gin.Default()
 
+	r.Static("/uploads", "./uploads")
+
 	r.POST("/create_task", controllers.CreateTask)
 	r.GET("/get_tasks", controllers.GetTasks)
 	r.GET("/task_details/:id", controllers.GetTaskDetails)
