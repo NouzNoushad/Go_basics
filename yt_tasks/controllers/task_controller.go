@@ -77,7 +77,10 @@ func CreateTask(c *gin.Context) {
 			FilePath: filePath,
 		}
 	} else {
-		image = nil
+		image = &models.Image{
+			Filename: "",
+			FilePath: "",
+		}
 	}
 
 	task.Id = uuid.New().String()
