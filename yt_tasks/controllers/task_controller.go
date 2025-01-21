@@ -57,22 +57,27 @@ func CreateTask(c *gin.Context) {
 		return
 	}
 
+	var image *models.Image
 	file, err := c.FormFile("image")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to upload image"})
-		return
-	}
+	if err == nil {
+		uploadDir := "uploads"
+		if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload directory"})
+			return
+		}
 
-	uploadDir := "uploads"
-	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload directory"})
-		return
-	}
+		filePath := filepath.Join(uploadDir, file.Filename)
+		if err := c.SaveUploadedFile(file, filePath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save metadata to server"})
+			return
+		}
 
-	filePath := filepath.Join(uploadDir, file.Filename)
-	if err := c.SaveUploadedFile(file, filePath); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save metadata to server"})
-		return
+		image = &models.Image{
+			Filename: file.Filename,
+			FilePath: filePath,
+		}
+	} else {
+		image = nil
 	}
 
 	task.Id = uuid.New().String()
@@ -83,10 +88,7 @@ func CreateTask(c *gin.Context) {
 	task.Status = status
 	task.Assignee = models.Assignee{
 		Username: userName,
-		Image: models.Image{
-			Filename: file.Filename,
-			FilePath: filePath,
-		},
+		Image:    image,
 	}
 	task.DueDate = dueDateParsed
 
@@ -202,7 +204,7 @@ func UpdateTaskDetails(c *gin.Context) {
 			return
 		}
 
-		task.Assignee.Image = models.Image{
+		task.Assignee.Image = &models.Image{
 			Filename: file.Filename,
 			FilePath: filePath,
 		}

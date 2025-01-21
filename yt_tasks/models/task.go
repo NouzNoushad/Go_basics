@@ -9,7 +9,7 @@ type Image struct {
 
 type Assignee struct {
 	Username string `json:"username"`
-	Image    Image  `json:"image" gorm:"embedded;embeddedPrefix=image_"`
+	Image    *Image  `json:"image,omitempty" gorm:"embedded;embeddedPrefix=image_"`
 }
 
 type Task struct {
