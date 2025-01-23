@@ -233,9 +233,11 @@ func DeleteTaskDetails(c *gin.Context) {
 	}
 
 	// remove assignee image from server
-	if err := os.Remove(task.Assignee.Image.FilePath); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete image from server"})
-		return
+	if task.Assignee.Image != nil && task.Assignee.Image.FilePath != "" {
+		if err := os.Remove(task.Assignee.Image.FilePath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete image from server"})
+			return
+		}
 	}
 
 	if err := config.DB.Delete(&task).Error; err != nil {
