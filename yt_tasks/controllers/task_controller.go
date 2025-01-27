@@ -59,6 +59,7 @@ func CreateTask(c *gin.Context) {
 
 	var image *models.Image
 	file, err := c.FormFile("image")
+	fmt.Println("///////////////file err: ", err)
 	if err == nil {
 		uploadDir := "uploads"
 		if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
@@ -66,14 +67,15 @@ func CreateTask(c *gin.Context) {
 			return
 		}
 
-		filePath := filepath.Join(uploadDir, file.Filename)
+		fileName := uuid.New().String() + file.Filename
+		filePath := filepath.Join(uploadDir, fileName)
 		if err := c.SaveUploadedFile(file, filePath); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save metadata to server"})
 			return
 		}
 
 		image = &models.Image{
-			Filename: file.Filename,
+			Filename: fileName,
 			FilePath: filePath,
 		}
 	} else {
@@ -201,14 +203,15 @@ func UpdateTaskDetails(c *gin.Context) {
 
 		// save new file
 		uploadDir := "uploads"
-		filePath := filepath.Join(uploadDir, file.Filename)
+		fileName := uuid.New().String() + file.Filename
+		filePath := filepath.Join(uploadDir, fileName)
 		if err := c.SaveUploadedFile(file, filePath); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save new file"})
 			return
 		}
 
 		task.Assignee.Image = &models.Image{
-			Filename: file.Filename,
+			Filename: fileName,
 			FilePath: filePath,
 		}
 	}
