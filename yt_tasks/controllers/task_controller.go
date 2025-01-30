@@ -196,9 +196,11 @@ func UpdateTaskDetails(c *gin.Context) {
 	file, err := c.FormFile("image")
 	if err == nil {
 		// remove old file
-		if err := os.Remove(task.Assignee.Image.FilePath); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete old image"})
-			return
+		if task.Assignee.Image != nil && task.Assignee.Image.FilePath != "" {
+			if err := os.Remove(task.Assignee.Image.FilePath); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete old image"})
+				return
+			}
 		}
 
 		// save new file
