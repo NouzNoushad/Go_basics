@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"learning/config"
 	"learning/models"
 	"net/http"
 	"os"
@@ -15,8 +16,8 @@ import (
 func CreateLearning(c *gin.Context) {
 	var learning models.Learning
 
-    // id
-    learningId := uuid.New().String()
+	// id
+	learningId := uuid.New().String()
 
 	// module no
 	moduleNo := c.PostForm("module_no")
@@ -62,12 +63,12 @@ func CreateLearning(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid category"})
 		return
 	}
-	
+
 	// thumbnail image
-    var thumbnailFile models.Thumbnail
-	thumbnailImage, err := c.FormFile("thumbnail_url")
+	var thumbnailFile models.Thumbnail
+	thumbnailImage, err := c.FormFile("thumbnail")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Thumbnail url is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Thumbnail is required"})
 		return
 	}
 
@@ -84,21 +85,23 @@ func CreateLearning(c *gin.Context) {
 		return
 	}
 
-    thumbnailFile = models.Thumbnail{
-        Filename: thumbnailName,
-        FilePath: thumbnailPath,
-    }
+	thumbnailFile = models.Thumbnail{
+		Filename: thumbnailName,
+		FilePath: thumbnailPath,
+	}
 
 	// ==========================================>>>>>>>>>>>>>>>> CHAPTER
-    chapterId := uuid.New().String()
-    // chapter no
-	chapterNo := c.PostForm("chapter_no")
-    if chapterNo == "" {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "Chapter number is required"})
-        return
-    }
+	var chapters []models.Chapter
 
-    chapterNoParsed, err := strconv.ParseInt(moduleNo, 10, 32)
+	chapterId := uuid.New().String()
+	// chapter no
+	chapterNo := c.PostForm("chapter_no")
+	if chapterNo == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Chapter number is required"})
+		return
+	}
+
+	chapterNoParsed, err := strconv.ParseInt(moduleNo, 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Chapter number must be a valid number"})
 		return
@@ -108,15 +111,15 @@ func CreateLearning(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Chapter number must be greater than zero"})
 		return
 	}
-    
-    // chapter name
-    chapterName := c.PostForm("chapter_name")
-    if chapterName == "" {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "Chapter name is required"})
-        return
-    }
 
-    // chapter duration
+	// chapter name
+	chapterName := c.PostForm("chapter_name")
+	if chapterName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Chapter name is required"})
+		return
+	}
+
+	// chapter duration
 	chapterDuration := c.PostForm("chapter_duration")
 	if chapterDuration == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Chapter duration is required"})
@@ -129,8 +132,8 @@ func CreateLearning(c *gin.Context) {
 		return
 	}
 
-    // chapter thumbnail
-    var chapterThumbnailFile *models.ChapterThumbnail
+	// chapter thumbnail
+	var chapterThumbnailFile *models.ChapterThumbnail
 	chapterImage, err := c.FormFile("chapter_thumpnail")
 	if err == nil {
 		chapterImageUploadDir := "uploads/chapter/images"
@@ -157,64 +160,68 @@ func CreateLearning(c *gin.Context) {
 		}
 	}
 
-    // chapter video
-    var chapterVideoFile models.ChapterVideo
-    chapterVideo, err := c.FormFile("chapter_video")
-    if err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "Chapter video not found"})
-        return
-    }
+	// chapter video
+	var chapterVideoFile models.ChapterVideo
+	chapterVideo, err := c.FormFile("chapter_video")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Chapter video not found"})
+		return
+	}
 
-    // validate file type
-    ext := filepath.Ext(chapterVideo.Filename)
-    if !isValidExtensions(ext) {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chater video extension"})
-        return
-    }
+	// validate file type
+	ext := filepath.Ext(chapterVideo.Filename)
+	if !isValidExtensions(ext) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chater video extension"})
+		return
+	}
 
-    chapterVideoUploadDir := "uploads/chapter/videos"
-		if err := os.MkdirAll(chapterVideoUploadDir, os.ModePerm); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create chapter video upload directory"})
-			return
-		}
+	chapterVideoUploadDir := "uploads/chapter/videos"
+	if err := os.MkdirAll(chapterVideoUploadDir, os.ModePerm); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create chapter video upload directory"})
+		return
+	}
 
-    // save file to the server
-    chapterVideoFileName := uuid.New().String() + chapterVideo.Filename
-    chapterVideoFilePath := filepath.Join(chapterVideoUploadDir, chapterVideoFileName)
+	// save file to the server
+	chapterVideoFileName := uuid.New().String() + chapterVideo.Filename
+	chapterVideoFilePath := filepath.Join(chapterVideoUploadDir, chapterVideoFileName)
 
-    if err := c.SaveUploadedFile(chapterVideo, chapterVideoFilePath); err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save chapter video file"})
-        return
-    }
+	if err := c.SaveUploadedFile(chapterVideo, chapterVideoFilePath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save chapter video file"})
+		return
+	}
 
-    chapterVideoFile = models.ChapterVideo{
-        ChapterVideoFilename: chapterVideoFileName,
-        ChapterVideoFilePath: chapterVideoFilePath,
-        ChapterVideoSize: chapterVideo.Size,
-    }
+	chapterVideoFile = models.ChapterVideo{
+		ChapterVideoFilename: chapterVideoFileName,
+		ChapterVideoFilePath: chapterVideoFilePath,
+		ChapterVideoSize:     chapterVideo.Size,
+	}
 
-    // tutor name
-    tutorName := c.PostForm("tutor_name")
+	// tutor name
+	tutorName := c.PostForm("tutor_name")
 
-    // chapter model
-    chapterModel := models.Chapter{
-        ChapterId: chapterId,
-        LearningId: learningId,
-        ChapterNo: int(chapterNoParsed),
-        ChapterName: chapterName,
-        ChapterDuration: float32(chapterDurationParsed),
-        ChapterThumbnail: chapterThumbnailFile,
-        ChapterVideo: chapterVideoFile,
-        TutorName: tutorName,
-    }
+	// chapter model
+	chapterModel := models.Chapter{
+		ChapterId:        chapterId,
+		LearningId:       learningId,
+		ChapterNo:        int(chapterNoParsed),
+		ChapterName:      chapterName,
+		ChapterDuration:  float32(chapterDurationParsed),
+		ChapterThumbnail: chapterThumbnailFile,
+		ChapterVideo:     chapterVideoFile,
+		TutorName:        tutorName,
+	}
+
+	chapters = append(chapters, chapterModel)
 
 	// ==========================================>>>>>>>>>>>>>>>> STUDY MATERIAL
-    // module id
-    materialId := uuid.New().String()
+	var studyMaterials []models.StudyMaterial
 
-    // material no
+	// module id
+	materialId := uuid.New().String()
+
+	// material no
 	materialNo := c.PostForm("material_no")
-    materialNoParsed, err := strconv.ParseInt(materialNo, 10, 32)
+	materialNoParsed, err := strconv.ParseInt(materialNo, 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Material number must be a valid number"})
 		return
@@ -225,11 +232,11 @@ func CreateLearning(c *gin.Context) {
 		return
 	}
 
-    // material name
-    materialName := c.PostForm("material_name")
-    
-    // material pdf
-    var materialPdfFile *models.MaterialPdf
+	// material name
+	materialName := c.PostForm("material_name")
+
+	// material pdf
+	var materialPdfFile *models.MaterialPdf
 	materialPdf, err := c.FormFile("material_pdf")
 	if err == nil {
 		materialUploadDir := "uploads/material"
@@ -256,19 +263,35 @@ func CreateLearning(c *gin.Context) {
 		}
 	}
 
-    // material model
-    materialModel
+	// material model
+	materialModel := models.StudyMaterial{
+		MaterialId:   materialId,
+		LearningId:   learningId,
+		MaterialNo:   int(materialNoParsed),
+		MaterialName: materialName,
+		MaterialPdf:  materialPdfFile,
+	}
 
-    chapters := []models.Chapter{chapterModel}
+	studyMaterials = append(studyMaterials, materialModel)
 
-    // set learning model
-    learningModel := models.Learning{
-        Id: learningId,
-        ModuleNo: int(moduleNoParsed),
-        ModuleName: moduleName,
-        TotalDuration: float32(totalDurationParsed),
-        Category: category,
-        Thumbnail: thumbnailFile,
-        Chapters: chapters,
-    }
+	// ==========================================>>>>>>>>>>>>>>>> SAVE
+	// set learning model
+	learning = models.Learning{
+		Id:             learningId,
+		ModuleNo:       int(moduleNoParsed),
+		ModuleName:     moduleName,
+		TotalDuration:  float32(totalDurationParsed),
+		Category:       category,
+		Thumbnail:      thumbnailFile,
+		Chapters:       &chapters,
+		StudyMaterials: &studyMaterials,
+	}
+
+	if err := config.DB.Create(&learning).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// success
+	c.JSON(http.StatusOK, gin.H{"message": "Learning created", "data": learning})
 }

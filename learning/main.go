@@ -1,7 +1,18 @@
 package main
 
-import "fmt"
+import (
+	"learning/config"
+	"learning/controllers"
+
+	"github.com/gin-gonic/gin"
+)
 
 func main() {
-	fmt.Println("Learning")
+	config.ConnectToDatabase()
+
+	r := gin.Default()
+
+	r.POST("/create_learning", controllers.CreateLearning)
+
+	r.Run(":8011")
 }
