@@ -13,3 +13,14 @@ func isValidCategory(category string) bool {
 	}
 	return false
 }
+
+func isValidExtensions(extension string) bool {
+	switch extension {
+		case ".mp4",
+		".avi",
+		".flv",
+		".mkv":
+		return true
+	}
+	return false
+}

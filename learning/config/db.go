@@ -21,7 +21,7 @@ func ConnectToDatabase() {
 		fmt.Println("Connected to database")
 	}
 
-	db.AutoMigrate(&models.Learning{})
+	db.AutoMigrate(&models.Learning{}, &models.Chapter{}, &models.StudyMaterial{})
 
 	DB = db
 }

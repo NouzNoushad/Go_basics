@@ -15,6 +15,9 @@ import (
 func CreateLearning(c *gin.Context) {
 	var learning models.Learning
 
+    // id
+    learningId := uuid.New().String()
+
 	// module no
 	moduleNo := c.PostForm("module_no")
 	if moduleNo == "" {
@@ -61,6 +64,7 @@ func CreateLearning(c *gin.Context) {
 	}
 	
 	// thumbnail image
+    var thumbnailFile models.Thumbnail
 	thumbnailImage, err := c.FormFile("thumbnail_url")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Thumbnail url is required"})
@@ -80,6 +84,191 @@ func CreateLearning(c *gin.Context) {
 		return
 	}
 
-	// chapters
-	
+    thumbnailFile = models.Thumbnail{
+        Filename: thumbnailName,
+        FilePath: thumbnailPath,
+    }
+
+	// ==========================================>>>>>>>>>>>>>>>> CHAPTER
+    chapterId := uuid.New().String()
+    // chapter no
+	chapterNo := c.PostForm("chapter_no")
+    if chapterNo == "" {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Chapter number is required"})
+        return
+    }
+
+    chapterNoParsed, err := strconv.ParseInt(moduleNo, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Chapter number must be a valid number"})
+		return
+	}
+
+	if chapterNoParsed <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Chapter number must be greater than zero"})
+		return
+	}
+    
+    // chapter name
+    chapterName := c.PostForm("chapter_name")
+    if chapterName == "" {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Chapter name is required"})
+        return
+    }
+
+    // chapter duration
+	chapterDuration := c.PostForm("chapter_duration")
+	if chapterDuration == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Chapter duration is required"})
+		return
+	}
+
+	chapterDurationParsed, err := strconv.ParseFloat(chapterDuration, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid duration"})
+		return
+	}
+
+    // chapter thumbnail
+    var chapterThumbnailFile *models.ChapterThumbnail
+	chapterImage, err := c.FormFile("chapter_thumpnail")
+	if err == nil {
+		chapterImageUploadDir := "uploads/chapter/images"
+		if err := os.MkdirAll(chapterImageUploadDir, os.ModePerm); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload directory"})
+			return
+		}
+
+		chapterFileName := uuid.New().String() + chapterImage.Filename
+		chapterFilePath := filepath.Join(chapterImageUploadDir, chapterFileName)
+		if err := c.SaveUploadedFile(chapterImage, chapterFilePath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save metadata to server"})
+			return
+		}
+
+		chapterThumbnailFile = &models.ChapterThumbnail{
+			ChapterFilename: chapterFileName,
+			ChapterFilePath: chapterFilePath,
+		}
+	} else {
+		chapterThumbnailFile = &models.ChapterThumbnail{
+			ChapterFilename: "",
+			ChapterFilePath: "",
+		}
+	}
+
+    // chapter video
+    var chapterVideoFile models.ChapterVideo
+    chapterVideo, err := c.FormFile("chapter_video")
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Chapter video not found"})
+        return
+    }
+
+    // validate file type
+    ext := filepath.Ext(chapterVideo.Filename)
+    if !isValidExtensions(ext) {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chater video extension"})
+        return
+    }
+
+    chapterVideoUploadDir := "uploads/chapter/videos"
+		if err := os.MkdirAll(chapterVideoUploadDir, os.ModePerm); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create chapter video upload directory"})
+			return
+		}
+
+    // save file to the server
+    chapterVideoFileName := uuid.New().String() + chapterVideo.Filename
+    chapterVideoFilePath := filepath.Join(chapterVideoUploadDir, chapterVideoFileName)
+
+    if err := c.SaveUploadedFile(chapterVideo, chapterVideoFilePath); err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save chapter video file"})
+        return
+    }
+
+    chapterVideoFile = models.ChapterVideo{
+        ChapterVideoFilename: chapterVideoFileName,
+        ChapterVideoFilePath: chapterVideoFilePath,
+        ChapterVideoSize: chapterVideo.Size,
+    }
+
+    // tutor name
+    tutorName := c.PostForm("tutor_name")
+
+    // chapter model
+    chapterModel := models.Chapter{
+        ChapterId: chapterId,
+        LearningId: learningId,
+        ChapterNo: int(chapterNoParsed),
+        ChapterName: chapterName,
+        ChapterDuration: float32(chapterDurationParsed),
+        ChapterThumbnail: chapterThumbnailFile,
+        ChapterVideo: chapterVideoFile,
+        TutorName: tutorName,
+    }
+
+	// ==========================================>>>>>>>>>>>>>>>> STUDY MATERIAL
+    // module id
+    materialId := uuid.New().String()
+
+    // material no
+	materialNo := c.PostForm("material_no")
+    materialNoParsed, err := strconv.ParseInt(materialNo, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Material number must be a valid number"})
+		return
+	}
+
+	if materialNoParsed <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Material number must be greater than zero"})
+		return
+	}
+
+    // material name
+    materialName := c.PostForm("material_name")
+    
+    // material pdf
+    var materialPdfFile *models.MaterialPdf
+	materialPdf, err := c.FormFile("material_pdf")
+	if err == nil {
+		materialUploadDir := "uploads/material"
+		if err := os.MkdirAll(materialUploadDir, os.ModePerm); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create material upload directory"})
+			return
+		}
+
+		materialFileName := uuid.New().String() + materialPdf.Filename
+		materialFilePath := filepath.Join(materialUploadDir, materialFileName)
+		if err := c.SaveUploadedFile(materialPdf, materialFilePath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save metadata to server"})
+			return
+		}
+
+		materialPdfFile = &models.MaterialPdf{
+			MaterialFilename: materialFileName,
+			MaterialFilePath: materialFilePath,
+		}
+	} else {
+		materialPdfFile = &models.MaterialPdf{
+			MaterialFilename: "",
+			MaterialFilePath: "",
+		}
+	}
+
+    // material model
+    materialModel
+
+    chapters := []models.Chapter{chapterModel}
+
+    // set learning model
+    learningModel := models.Learning{
+        Id: learningId,
+        ModuleNo: int(moduleNoParsed),
+        ModuleName: moduleName,
+        TotalDuration: float32(totalDurationParsed),
+        Category: category,
+        Thumbnail: thumbnailFile,
+        Chapters: chapters,
+    }
 }
