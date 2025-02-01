@@ -17,6 +17,7 @@ func main() {
 	r.POST("/create_study_material", controllers.CreateStudyMaterial)
 	r.GET("/get_learning", controllers.GetLearningList)
 	r.GET("/get_learning_details/:id", controllers.GetLearningById)
+	r.DELETE("/delete_learning_details/:id", controllers.DeleteLearning)
 
 	r.Run(":8011")
 }

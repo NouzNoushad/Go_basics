@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"learning/config"
 	"learning/models"
 	"net/http"
@@ -16,7 +17,7 @@ func GetLearningList(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": learnings})
+	c.JSON(http.StatusOK, gin.H{"items": fmt.Sprintf("%d items", len(learnings)), "data": learnings})
 }
 
 // get learning by id
