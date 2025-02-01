@@ -15,6 +15,8 @@ func main() {
 	r.POST("/create_learning", controllers.CreateLearning)
 	r.POST("/create_chapter", controllers.CreateChapter)
 	r.POST("/create_study_material", controllers.CreateStudyMaterial)
+	r.GET("/get_learning", controllers.GetLearningList)
+	r.GET("/get_learning_details/:id", controllers.GetLearningById)
 
 	r.Run(":8011")
 }
