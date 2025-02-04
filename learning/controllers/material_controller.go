@@ -96,12 +96,6 @@ func UpdateStudyMaterial(c *gin.Context) {
         return
     }
 
-	// material id
-	materialId := c.PostForm("material_id")
-	if materialId != "" {
-		studyMaterial.MaterialId = materialId
-	}
-
 	// learning id
 	learningId := c.PostForm("learning_id")
 	if learningId != "" {
