@@ -64,6 +64,7 @@ func CreateLearning(c *gin.Context) {
 
 	thumbnailName := uuid.New().String() + thumbnailImage.Filename
 	thumbnailPath := filepath.Join(uploadDir, thumbnailName)
+	
 	if err := c.SaveUploadedFile(thumbnailImage, thumbnailPath); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create thumbnail file server"})
 		return
@@ -91,4 +92,90 @@ func CreateLearning(c *gin.Context) {
 
 	// success
 	c.JSON(http.StatusOK, gin.H{"message": "Learning created", "data": learning})
+}
+
+// update learning
+func UpdateLearning(c *gin.Context) {
+	id := c.Param("id")
+	var learning models.Learning
+
+	if err := config.DB.Where("id = ?", id).First(&learning).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Module not found"})
+		return
+	}
+
+	// module no
+	moduleNo := c.PostForm("module_no")
+	if moduleNo != "" {
+		moduleNoParsed, err := strconv.Atoi(moduleNo)
+		if err != nil || moduleNoParsed <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Module no must be valid number"})
+			return
+		}
+		learning.ModuleNo = moduleNoParsed
+ 	}
+
+	// module name
+	moduleName := c.PostForm("module_name")
+	if moduleName != "" {
+		learning.ModuleName = moduleName
+	}
+
+	// total duration
+	totalDuration := c.PostForm("total_duration")
+	if totalDuration != "" {
+		totalDurationParsed, err := strconv.ParseFloat(totalDuration, 32)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid total duration"})
+			return
+		}
+		learning.TotalDuration = float32(totalDurationParsed)
+	}
+
+	// category
+	category := c.PostForm("category")
+	if category != "" {
+		// check category
+		if !isValidCategory(category) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid category"})
+			return
+		}
+		learning.Category = category
+	}
+
+	// thumbnail image
+	var thumbnailFile models.Thumbnail
+	thumbnailImage, err := c.FormFile("thumbnail")
+	if err == nil {
+		// delete old thumbnail
+		if err := os.Remove(learning.Thumbnail.FilePath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete old thumbnail"})
+			return
+		}
+
+		uploadDir := "uploads/module"
+		thumbnailName := uuid.New().String() + thumbnailImage.Filename
+		thumbnailPath := filepath.Join(uploadDir, thumbnailName)
+
+		if err := c.SaveUploadedFile(thumbnailImage, thumbnailPath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Faile to create thumbnail file server"})
+			return
+		}
+
+		thumbnailFile = models.Thumbnail{
+			Filename: thumbnailName,
+			FilePath: thumbnailPath,
+		}
+
+		learning.Thumbnail = thumbnailFile
+	}
+
+	// update module
+	if err := config.DB.Save(&learning).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// success
+	c.JSON(http.StatusOK, gin.H{"message": "Module updated", "data": learning})
 }

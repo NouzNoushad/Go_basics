@@ -22,6 +22,7 @@ func main() {
 	r.DELETE("/delete_learning_details/:id", controllers.DeleteLearning)
 	r.PUT("/update_study_material/:id", controllers.CreateStudyMaterial)
 	r.PUT("/update_chapter/:id", controllers.UpdateChapter)
+	r.PUT("/update_learning/:id", controllers.UpdateLearning)
 
 	r.Run(":8011")
 }
