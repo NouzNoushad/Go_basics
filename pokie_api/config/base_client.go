@@ -13,11 +13,11 @@ const apiUrl = "https://pokeapi.co/api/v2/"
 
 var c *cache.Cache
 
-func init() {
+func Init() {
 	c = cache.New(DefaultCacheSettings.MinExpire, DefaultCacheSettings.MaxExpire)
 }
 
-func call(endpoint string, obj interface{}) error {
+func Call(endpoint string, obj interface{}) error {
 	cached, found := c.Get(endpoint)
 	if found && CacheSettings.UseCache {
 		return json.Unmarshal(cached.([]byte), &obj)

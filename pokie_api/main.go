@@ -1,7 +1,18 @@
 package main
 
-import "fmt"
+import (
+	"pokie_api/config"
+	"pokie_api/controllers"
 
+	"github.com/gin-gonic/gin"
+)
+
+// pokemon apis
 func main() {
-	fmt.Println("Hello Pokie api")
+	config.Init()
+
+	r := gin.Default()
+	r.GET("/get_pokemon/:id", controllers.GetPokemon)
+
+	r.Run(":8012")
 }
