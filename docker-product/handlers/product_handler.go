@@ -4,10 +4,12 @@ import (
 	"docker-product/database"
 	"docker-product/models"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/google/uuid"
+	"github.com/gorilla/mux"
 )
 
 func isEmptyField(field string) bool {
@@ -76,3 +78,50 @@ func CreateProduct(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"message": "product created", "product": product})
 }
 
+// get products
+func GetProducts(w http.ResponseWriter, r *http.Request) {
+	var products []models.Product
+
+	if err := database.DB.Order("created_at desc").Find(&products).Error; err != nil {
+		http.Error(w, "Failed to fetch products", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{"data": products, "items": fmt.Sprintf("%d items", len(products))})
+}
+
+// get product by id
+func GetProductDetails(w http.ResponseWriter, r *http.Request) {
+	var product models.Product
+	params := mux.Vars(r)
+	id := params["id"]
+
+	if err := database.DB.Where("id = ?", id).First(&product).Error; err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{"data": product})
+}
+
+// delete product
+func DeleteProductDetails(w http.ResponseWriter, r *http.Request) {
+	var product models.Product
+	params := mux.Vars(r)
+	id := params["id"]
+
+	if err := database.DB.Where("id = ?", id).First(&product).Error; err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := database.DB.Delete(&product).Error; err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{"message": "Product deleted"})
+}
