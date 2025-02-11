@@ -1,7 +1,7 @@
 package routes
 
 import (
-	"net/http"
+	"chat/handlers"
 
 	"github.com/gin-gonic/gin"
 )
@@ -10,9 +10,8 @@ func Routes() *gin.Engine {
 
 	router := gin.Default()
 
-	router.GET("/", func(ctx *gin.Context) {
-		ctx.JSON(http.StatusOK, gin.H{"message": "status ok"})
-	})
+	router.POST("/register-user", handlers.RegisterUser)
+	router.POST("/login-user", handlers.LoginUser)
 
 	return router
 }
