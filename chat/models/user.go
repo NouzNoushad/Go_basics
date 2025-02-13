@@ -9,3 +9,9 @@ type User struct {
 	Password  string    `json:"password"`
 	CreatedAt time.Time `json:"created_at"`
 }
+
+type Message struct {
+	Id       uint   `json:"id" gorm:"primaryKey"`
+	Username string `json:"username"`
+	Content  string `json:"content"`
+}

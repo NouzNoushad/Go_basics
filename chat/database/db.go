@@ -36,5 +36,5 @@ func InitDB() {
 	}
 	fmt.Println("Connected to the database")
 
-	DB.AutoMigrate(&models.User{})
+	DB.AutoMigrate(&models.User{}, &models.Message{})
 }

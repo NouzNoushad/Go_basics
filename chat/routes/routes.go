@@ -6,12 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func Routes() *gin.Engine {
-
-	router := gin.Default()
-
+func Routes(router *gin.Engine) {
 	router.POST("/register-user", handlers.RegisterUser)
 	router.POST("/login-user", handlers.LoginUser)
-
-	return router
+	router.GET("/ws", handlers.HandleConnections)
 }
