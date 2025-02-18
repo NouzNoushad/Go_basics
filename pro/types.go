@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -24,6 +25,33 @@ func NewProduct(id, name, brand, category string, price float64, quantity int64)
 		Quantity:  quantity,
 		CreatedAt: time.Now().UTC(),
 	}, nil
+}
+
+func UpdateProduct(product *Product, name, brand, category string, price float64, quantity int64) (*Product, error) {
+	if name != "" {
+		product.Name = name
+	}
+
+	if brand != "" {
+		product.Brand = brand
+	}
+
+	if category != "" {
+		if !ValidCategory(category) {
+			return nil, fmt.Errorf("invalid category %s", category)
+		}
+		product.Category = category
+	}
+
+	if price != 0 {
+		product.Price = price
+	}
+
+	if quantity != 0 {
+		product.Quantity = quantity
+	}
+
+	return product, nil
 }
 
 func ValidCategory(category string) bool {

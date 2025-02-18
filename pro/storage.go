@@ -119,13 +119,30 @@ func (s *PostgresStore) GetProductByID(id string) (*Product, error) {
 		return scanIntoAccount(row)
 	}
 
-	return nil, fmt.Errorf("account %d not found", id)
+	return nil, fmt.Errorf("account with id [%s] not found", id)
 }
 
 func (s *PostgresStore) DeleteProduct(id string) error {
-	return nil
+	query := "delete from product where id = $1"
+	_, err := s.db.Query(query, id)
+
+	return err
 }
 
 func (s *PostgresStore) UpdateProduct(id string, product *Product) error {
+	query := "update product set name=$1, brand=$2, category=$3, price=$4, quantity=$5 where id=$6"
+	_, err := s.db.Query(
+		query,
+		product.Name,
+		product.Brand,
+		product.Category,
+		product.Price,
+		product.Quantity,
+		id)
+
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

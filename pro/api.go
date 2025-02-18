@@ -48,6 +48,14 @@ func (s *APIServer) handleProductByID(w http.ResponseWriter, r *http.Request) er
 		return s.handleGetProductByID(w, r)
 	}
 
+	if r.Method == "DELETE" {
+		return s.handleDeleteProduct(w, r)
+	}
+
+	if r.Method == "PUT" {
+		return s.handleUpdateProduct(w, r)
+	}
+
 	return fmt.Errorf("method not allowed %s", r.Method)
 }
 
@@ -131,10 +139,7 @@ func (s *APIServer) handleGetProducts(w http.ResponseWriter, _ *http.Request) er
 
 func (s *APIServer) handleGetProductByID(w http.ResponseWriter, r *http.Request) error {
 
-	id, err := getID(r)
-	if err != nil {
-		return err
-	}
+	id := getID(r)
 
 	product, err := s.store.GetProductByID(id)
 	if err != nil {
@@ -146,10 +151,53 @@ func (s *APIServer) handleGetProductByID(w http.ResponseWriter, r *http.Request)
 	})
 }
 
-func getID(r *http.Request) (string, error) {
+func (s *APIServer) handleDeleteProduct(w http.ResponseWriter, r *http.Request) error {
+
+	id := getID(r)
+
+	if err := s.store.DeleteProduct(id); err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"message": "product deleted",
+		"id":      id,
+	})
+}
+
+func (s *APIServer) handleUpdateProduct(w http.ResponseWriter, r *http.Request) error {
+
+	id := getID(r)
+
+	extProduct, err := s.store.GetProductByID(id)
+	if err != nil {
+		return err
+	}
+
+	req := new(Product)
+	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
+		return err
+	}
+
+	product, err := UpdateProduct(extProduct, req.Name, req.Brand, req.Category, req.Price, req.Quantity)
+	if err != nil {
+		return err
+	}
+
+	if err := s.store.UpdateProduct(id, product); err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"message": "Product updated",
+		"data":    product,
+	})
+}
+
+func getID(r *http.Request) string {
 	id := mux.Vars(r)["id"]
 
-	return id, nil
+	return id
 }
 
 func WriteJSON(w http.ResponseWriter, status int, v any) error {
