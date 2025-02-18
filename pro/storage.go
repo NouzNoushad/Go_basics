@@ -2,16 +2,17 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 
 	_ "github.com/lib/pq"
 )
 
 type Storage interface {
 	CreateProduct(*Product) error
-	GetProducts() (*[]Product, error)
-	GetProductByID(int) (*Product, error)
-	UpdateProduct(int, *Product) error
-	DeleteProduct(int) error
+	GetProducts() ([]*Product, error)
+	GetProductByID(string) (*Product, error)
+	UpdateProduct(string, *Product) error
+	DeleteProduct(string) error
 }
 
 type PostgresStore struct {
@@ -74,18 +75,57 @@ func (s *PostgresStore) CreateProduct(product *Product) error {
 	return nil
 }
 
-func (s *PostgresStore) GetProducts() (*[]Product, error) {
-	return nil, nil
+func (s *PostgresStore) GetProducts() ([]*Product, error) {
+	query := "select * from product"
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+
+	products := []*Product{}
+	for rows.Next() {
+		product, err := scanIntoAccount(rows)
+		if err != nil {
+			return nil, err
+		}
+		products = append(products, product)
+	}
+
+	return products, nil
 }
 
-func (s *PostgresStore) GetProductByID(id int) (*Product, error) {
-	return nil, nil
+func scanIntoAccount(rows *sql.Rows) (*Product, error) {
+	product := new(Product)
+	err := rows.Scan(
+		&product.ID,
+		&product.Name,
+		&product.Brand,
+		&product.Category,
+		&product.Price,
+		&product.Quantity,
+		&product.CreatedAt)
+
+	return product, err
 }
 
-func (s *PostgresStore) DeleteProduct(id int) error {
+func (s *PostgresStore) GetProductByID(id string) (*Product, error) {
+	query := "select * from product where id = $1"
+	row, err := s.db.Query(query, id)
+	if err != nil {
+		return nil, err
+	}
+
+	for row.Next() {
+		return scanIntoAccount(row)
+	}
+
+	return nil, fmt.Errorf("account %d not found", id)
+}
+
+func (s *PostgresStore) DeleteProduct(id string) error {
 	return nil
 }
 
-func (s *PostgresStore) UpdateProduct(id int, product *Product) error {
+func (s *PostgresStore) UpdateProduct(id string, product *Product) error {
 	return nil
 }

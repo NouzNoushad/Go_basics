@@ -26,6 +26,7 @@ func (s *APIServer) Run() {
 	router := mux.NewRouter()
 
 	router.HandleFunc("/product", makeHandleFunc(s.handleProduct))
+	router.HandleFunc("/product/{id}", makeHandleFunc(s.handleProductByID))
 
 	http.ListenAndServe(s.listenAddr, router)
 }
@@ -37,6 +38,14 @@ func (s *APIServer) handleProduct(w http.ResponseWriter, r *http.Request) error 
 
 	if r.Method == "GET" {
 		return s.handleGetProducts(w, r)
+	}
+
+	return fmt.Errorf("method not allowed %s", r.Method)
+}
+
+func (s *APIServer) handleProductByID(w http.ResponseWriter, r *http.Request) error {
+	if r.Method == "GET" {
+		return s.handleGetProductByID(w, r)
 	}
 
 	return fmt.Errorf("method not allowed %s", r.Method)
@@ -72,7 +81,7 @@ func validateProduct(req *Product) error {
 
 func (s *APIServer) createProduct(req *Product) (*Product, error) {
 	id := uuid.New().String()
-	
+
 	product, err := NewProduct(id, req.Name, req.Brand, req.Category, req.Price, req.Quantity)
 	if err != nil {
 		return nil, err
@@ -108,7 +117,39 @@ func (s *APIServer) handleCreateProduct(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *APIServer) handleGetProducts(w http.ResponseWriter, _ *http.Request) error {
-	return WriteJSON(w, http.StatusOK, map[string]string{"message": "get products"})
+
+	products, err := s.store.GetProducts()
+	if err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"data":  products,
+		"items": fmt.Sprintf("%d items", len(products)),
+	})
+}
+
+func (s *APIServer) handleGetProductByID(w http.ResponseWriter, r *http.Request) error {
+
+	id, err := getID(r)
+	if err != nil {
+		return err
+	}
+
+	product, err := s.store.GetProductByID(id)
+	if err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"data": product,
+	})
+}
+
+func getID(r *http.Request) (string, error) {
+	id := mux.Vars(r)["id"]
+
+	return id, nil
 }
 
 func WriteJSON(w http.ResponseWriter, status int, v any) error {
