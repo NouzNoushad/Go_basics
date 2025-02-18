@@ -95,6 +95,14 @@ func (s *APIServer) handleGetAccountByID(w http.ResponseWriter, r *http.Request)
 		})
 	}
 
+	if r.Method == "DELETE" {
+		return s.handleDeleteAccount(w, r)
+	}
+
+	if r.Method == "PUT" {
+		return s.handleUpdateAccount(w, r)
+	}
+
 	return fmt.Errorf("method not allowed %s", r.Method)
 }
 
@@ -138,6 +146,52 @@ func createJWT(account *Account) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	return token.SignedString([]byte(secret))
+}
+
+func (s *APIServer) handleDeleteAccount(w http.ResponseWriter, r *http.Request) error {
+	id, err := getID(r)
+	if err != nil {
+		return err
+	}
+
+	if err := s.store.DeleteAccount(id); err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, map[string]int{
+		"deleted": id,
+	})
+}
+
+func (s *APIServer) handleUpdateAccount(w http.ResponseWriter, r *http.Request) error {
+	id, err := getID(r)
+	if err != nil {
+		return err
+	}
+
+    extAccount, err := s.store.GetAccountByID(id)
+    if err != nil {
+        return err
+    }
+
+	req := new(UpdateAcountRequest)
+	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
+		return err
+	}
+
+	account, err := UpdateAccount(req.FirstName, req.LastName, req.Password, *extAccount)
+	if err != nil {
+		return err
+	}
+
+	if err := s.store.UpdateAccount(account, id); err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"message": "account updated",
+		"account": account,
+	})
 }
 
 func permissionDenied(w http.ResponseWriter) {
