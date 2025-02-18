@@ -35,16 +35,17 @@ func NewPostgresStore() (*PostgresStore, error) {
 }
 
 func (s *PostgresStore) Init() error {
+
 	return s.createAccountTable()
 }
 
 func (s *PostgresStore) createAccountTable() error {
 	query := `create table if not exists product(
-		id serial primary key,
+		id varchar(100) primary key,
 		name varchar(100) not null,
 		brand varchar(100),
 		category varchar(50),
-		price integer not null,
+		price numeric not null,
 		quantity integer not null,
 		created_at timestamp
 	)`
@@ -54,6 +55,22 @@ func (s *PostgresStore) createAccountTable() error {
 }
 
 func (s *PostgresStore) CreateProduct(product *Product) error {
+	query := `insert into product (id, name, brand, category, price, quantity, created_at) values ($1, $2, $3, $4, $5, $6, $7)`
+
+	_, err := s.db.Query(
+		query,
+		product.ID,
+		product.Name,
+		product.Brand,
+		product.Category,
+		product.Price,
+		product.Quantity,
+		product.CreatedAt,
+	)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
