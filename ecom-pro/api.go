@@ -32,8 +32,11 @@ func (s *APIServer) Run() {
 	router := mux.NewRouter()
 
 	router.HandleFunc("/product", makeHandleFunc(s.handleProduct))
+	router.HandleFunc("/product/{id}", makeHandleFunc(s.handleProductByID))
 	router.HandleFunc("/media", makeHandleFunc(s.handleMedia))
+	router.HandleFunc("/media/{id}", makeHandleFunc(s.handleMediaByID))
 	router.HandleFunc("/variation", makeHandleFunc(s.handleVariation))
+	router.HandleFunc("/variation/{id}", makeHandleFunc(s.handleVariationByID))
 
 	http.ListenAndServe(s.listenAddr, router)
 }
@@ -46,6 +49,15 @@ func (s *APIServer) handleProduct(w http.ResponseWriter, r *http.Request) error 
 
 	if r.Method == "POST" {
 		return s.handleAddProduct(w, r)
+	}
+
+	return fmt.Errorf("method not allowed %s", r.Method)
+}
+
+// handle request methods (product by id)
+func (s *APIServer) handleProductByID(w http.ResponseWriter, r *http.Request) error {
+	if r.Method == "GET" {
+		return s.handleGetProductByID(w, r)
 	}
 
 	return fmt.Errorf("method not allowed %s", r.Method)
@@ -64,6 +76,15 @@ func (s *APIServer) handleMedia(w http.ResponseWriter, r *http.Request) error {
 	return fmt.Errorf("method not allowed %s", r.Method)
 }
 
+// handle request methods (media by id)
+func (s *APIServer) handleMediaByID(w http.ResponseWriter, r *http.Request) error {
+	if r.Method == "GET" {
+		return s.handleGetMediaByID(w, r)
+	}
+
+	return fmt.Errorf("method not allowed %s", r.Method)
+}
+
 // handle request methods (variation)
 func (s *APIServer) handleVariation(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "GET" {
@@ -72,6 +93,15 @@ func (s *APIServer) handleVariation(w http.ResponseWriter, r *http.Request) erro
 
 	if r.Method == "POST" {
 		return s.handleAddVariation(w, r)
+	}
+
+	return fmt.Errorf("method not allowed %s", r.Method)
+}
+
+// handle request methods (variation by id)
+func (s *APIServer) handleVariationByID(w http.ResponseWriter, r *http.Request) error {
+	if r.Method == "GET" {
+		return s.handleGetVariationByID(w, r)
 	}
 
 	return fmt.Errorf("method not allowed %s", r.Method)
@@ -301,6 +331,21 @@ func (s *APIServer) handleGetProducts(w http.ResponseWriter, _ *http.Request) er
 	})
 }
 
+// handle get product by ID
+func (s *APIServer) handleGetProductByID(w http.ResponseWriter, r *http.Request) error {
+
+	id := getID(r)
+
+	product, err := s.store.GetProductByID(id)
+	if err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"data": product,
+	})
+}
+
 // handle add media
 func (s *APIServer) handleAddMedia(w http.ResponseWriter, r *http.Request) error {
 	media := new(Media)
@@ -360,6 +405,21 @@ func (s *APIServer) handleGetMedias(w http.ResponseWriter, _ *http.Request) erro
 	})
 }
 
+// handle get media by id
+func (s *APIServer) handleGetMediaByID(w http.ResponseWriter, r *http.Request) error {
+
+	id := getID(r)
+
+	media, err := s.store.GetMediaByID(id)
+	if err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"data": media,
+	})
+}
+
 // handle add variaton
 func (s *APIServer) handleAddVariation(w http.ResponseWriter, r *http.Request) error {
 	variation := new(Variation)
@@ -400,7 +460,7 @@ func (s *APIServer) handleAddVariation(w http.ResponseWriter, r *http.Request) e
 }
 
 // handle get variations
-func (s *APIServer) handleGetVariations(w http.ResponseWriter, r *http.Request) error {
+func (s *APIServer) handleGetVariations(w http.ResponseWriter, _ *http.Request) error {
 	variations, err := s.store.GetVariations()
 	if err != nil {
 		return err
@@ -411,6 +471,28 @@ func (s *APIServer) handleGetVariations(w http.ResponseWriter, r *http.Request) 
 		"data":  variations,
 		"items": fmt.Sprintf("%d items", len(variations)),
 	})
+}
+
+// handle get variation by ID
+func (s *APIServer) handleGetVariationByID(w http.ResponseWriter, r *http.Request) error {
+
+	id := getID(r)
+
+	variation, err := s.store.GetVariationByID(id)
+	if err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"data": variation,
+	})
+}
+
+// get ID
+func getID(r *http.Request) string {
+	id := mux.Vars(r)["id"]
+
+	return id
 }
 
 // parse error
