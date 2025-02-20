@@ -32,6 +32,7 @@ func (s *APIServer) Run() {
 	router := mux.NewRouter()
 
 	router.HandleFunc("/product", makeHandleFunc(s.handleProduct))
+	router.HandleFunc("/media", makeHandleFunc(s.handleMedia))
 
 	http.ListenAndServe(s.listenAddr, router)
 }
@@ -44,6 +45,19 @@ func (s *APIServer) handleProduct(w http.ResponseWriter, r *http.Request) error 
 
 	if r.Method == "POST" {
 		return s.handleAddProduct(w, r)
+	}
+
+	return fmt.Errorf("method not allowed %s", r.Method)
+}
+
+// handle request methods (medi)
+func (s *APIServer) handleMedia(w http.ResponseWriter, r *http.Request) error {
+	if r.Method == "GET" {
+		return s.handleGetMedias(w, r)
+	}
+
+	if r.Method == "POST" {
+		return s.handleAddMedia(w, r)
 	}
 
 	return fmt.Errorf("method not allowed %s", r.Method)
@@ -112,12 +126,23 @@ func productValidation(product *Product) error {
 	return nil
 }
 
+// media validation
+func mediaValidation(media *Media) error {
+
+	// product id,
+	if media.ProductID == "" {
+		return validationError("Product ID is required")
+	}
+
+	return nil
+}
+
 // create file
 func createFile(r *http.Request, rName string, dirName string) (string, string, error) {
 	// thumbnail
 	file, fileHeader, err := r.FormFile(rName)
 	if err != nil {
-		return "", "", validationError("Thumbnail upload failed")
+		return "", "", validationError("File upload failed")
 	}
 	defer file.Close()
 
@@ -197,14 +222,14 @@ func (s *APIServer) handleAddProduct(w http.ResponseWriter, r *http.Request) err
 		return parseError(w, "Invalide in physical format")
 	}
 
-    product.CreatedAt = time.Now().UTC()
+	product.CreatedAt = time.Now().UTC().Format(time.RFC3339)
 
-    // validation
+	// validation
 	if err := productValidation(product); err != nil {
 		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: err.Error()})
 	}
 
-    // create file
+	// create file
 	product.ThumbnailName, product.ThumbnailPath, err = createFile(r, "thumbnail", "uploads")
 	if err != nil {
 		return WriteJSON(w, http.StatusInternalServerError, ApiError{Error: err.Error()})
@@ -230,14 +255,80 @@ func (s *APIServer) handleAddProduct(w http.ResponseWriter, r *http.Request) err
 
 // handle get product
 func (s *APIServer) handleGetProducts(w http.ResponseWriter, _ *http.Request) error {
-	return WriteJSON(w, http.StatusOK, map[string]string{
-		"message": "get product",
+
+	products, err := s.store.GetProducts()
+	if err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"data":  products,
+		"items": fmt.Sprintf("%d items", len(products)),
+	})
+}
+
+// handle add media
+func (s *APIServer) handleAddMedia(w http.ResponseWriter, r *http.Request) error {
+	media := new(Media)
+
+	// parse multipart form
+	err := r.ParseMultipartForm(10 << 20)
+	if err != nil {
+		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: "Failed to parse form"})
+	}
+
+	media.ID = uuid.New().String()
+	media.ProductID = r.FormValue("product_id")
+
+	media.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+
+	// validation
+	if err := mediaValidation(media); err != nil {
+		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: err.Error()})
+	}
+
+	// create file
+	media.MediaFilename, media.MediaFilePath, err = createFile(r, "media_image", "medias")
+	if err != nil {
+		return WriteJSON(w, http.StatusInternalServerError, ApiError{Error: err.Error()})
+	}
+
+	// media model
+	newMedia, err := NewMedia(media)
+	if err != nil {
+		return WriteJSON(w, http.StatusInternalServerError, ApiError{Error: err.Error()})
+	}
+
+	// store
+	if err := s.store.AddMedia(newMedia); err != nil {
+		return WriteJSON(w, http.StatusInternalServerError, ApiError{Error: err.Error()})
+	}
+
+	// success
+	return WriteJSON(w, http.StatusCreated, map[string]interface{}{
+		"message": "Media added",
+		"data":    media,
+	})
+}
+
+// handle get medias
+func (s *APIServer) handleGetMedias(w http.ResponseWriter, _ *http.Request) error {
+
+	medias, err := s.store.GetMedias()
+	if err != nil {
+		return err
+	}
+
+	// success
+	return WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"data":  medias,
+		"items": fmt.Sprintf("%d items", len(medias)),
 	})
 }
 
 // parse error
 func parseError(w http.ResponseWriter, errStr string) error {
-    return WriteJSON(w, http.StatusBadRequest, ApiError{Error: errStr})
+	return WriteJSON(w, http.StatusBadRequest, ApiError{Error: errStr})
 }
 
 // string to float
