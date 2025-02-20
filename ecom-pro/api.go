@@ -2,12 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -47,153 +49,179 @@ func (s *APIServer) handleProduct(w http.ResponseWriter, r *http.Request) error 
 	return fmt.Errorf("method not allowed %s", r.Method)
 }
 
-// handle add product
-func (s *APIServer) handleAddProduct(w http.ResponseWriter, r *http.Request) error {
-	// parse multipart form
-	err := r.ParseMultipartForm(10 << 20)
-	if err != nil {
-		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: "Failed to parse form"})
+// validation error
+func validationError(err string) error {
+	return errors.New(err)
+}
+
+// product validation
+func productValidation(product *Product) error {
+	// status,
+	if !isValidStatus(product.Status) {
+		return validationError("Invalid status")
 	}
 
-	// id
-	id := uuid.New().String()
+	// category,
+	if !isValidCategory(product.Category) {
+		return validationError("Invalid category")
+	}
 
+	// template,
+	if !isValidTemplate(product.Template) {
+		return validationError("Invalid template")
+	}
+
+	// name,
+	if product.Name == "" {
+		return validationError("Name is required")
+	}
+
+	// price,
+	if product.Price == 0 {
+		return validationError("Price is required and should not be zero")
+	}
+
+	// discount_type,
+	if !isValidDiscountType(product.DiscountType) {
+		return validationError("Invalid discount type")
+	}
+
+	// tax_class,
+	if product.TaxClass == "" {
+		return validationError("Tax class is required")
+	}
+	if !isValidTaxClass(product.TaxClass) {
+		return validationError("Invalid tax class")
+	}
+
+	// sku_number,
+	if product.SKUNumber == "" {
+		return validationError("SKU Number is required")
+	}
+
+	// barcode_number,
+	if product.BarcodeNumber == "" {
+		return validationError("Barcode Number is required")
+	}
+
+	// on_shelf,
+	if product.OnShelf == 0 {
+		return validationError("Quantity on shelf is required")
+	}
+
+	return nil
+}
+
+// create file
+func createFile(r *http.Request, rName string, dirName string) (string, string, error) {
 	// thumbnail
-	file, fileHeader, err := r.FormFile("thumbnail")
+	file, fileHeader, err := r.FormFile(rName)
 	if err != nil {
-		return WriteJSON(w, http.StatusInternalServerError, ApiError{Error: "Thumbnail upload failed"})
+		return "", "", validationError("Thumbnail upload failed")
 	}
 	defer file.Close()
 
 	// create upload dir
-	uploadDir := "uploads"
+	uploadDir := dirName
 	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
-		return WriteJSON(w, http.StatusInternalServerError, ApiError{Error: "Failed to create uploads directory"})
+		return "", "", validationError("Failed to create uploads directory")
 	}
 
 	// save file
-	fileName := uuid.New().String() + fileHeader.Filename
+	fileName := uuid.New().String() + "_" + fileHeader.Filename
 	filePath := filepath.Join(uploadDir, fileName)
 	outFile, err := os.Create(filePath)
 	if err != nil {
-		return WriteJSON(w, http.StatusInternalServerError, ApiError{Error: "Failed to save file"})
+		return "", "", validationError("Failed to save file")
 	}
 	defer outFile.Close()
 
 	// copy file contents
 	_, err = io.Copy(outFile, file)
 	if err != nil {
-		return WriteJSON(w, http.StatusInternalServerError, ApiError{Error: "Failed to copy file"})
+		return "", "", validationError("Failed to copy file")
 	}
 
-	// 		status,
-	status := r.FormValue("status")
+	return fileName, filePath, nil
+}
 
-	// 		category,
-	category := r.FormValue("category")
+// handle add product
+func (s *APIServer) handleAddProduct(w http.ResponseWriter, r *http.Request) error {
+	product := new(Product)
 
-	// 		tag,
-	tag := r.FormValue("tag")
-
-	// 		template,
-	template := r.FormValue("template")
-
-	// 		name,
-	name := r.FormValue("name")
-	if name == "" {
-		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: "Name is required"})
-	}
-
-	// 		description,
-	description := r.FormValue("description")
-
-	// 		price,
-	price := r.FormValue("price")
-	priceParsed, err := strconv.ParseFloat(price, 64)
+	// parse multipart form
+	err := r.ParseMultipartForm(10 << 20)
 	if err != nil {
-		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: "Invalid price format"})
-	}
-	if priceParsed == 0 {
-		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: "Price is required"})
+		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: "Failed to parse form"})
 	}
 
-	// 		discount_type,
-	discountType := r.FormValue("discount_type")
+	product.ID = uuid.New().String()
+	product.Status = r.FormValue("status")
+	product.Category = r.FormValue("category")
+	product.Tag = r.FormValue("tag")
+	product.Template = r.FormValue("template")
+	product.Name = r.FormValue("name")
+	product.Description = r.FormValue("description")
+	product.DiscountType = r.FormValue("discount_type")
+	product.TaxClass = r.FormValue("tax_class")
+	product.SKUNumber = r.FormValue("sku_number")
+	product.BarcodeNumber = r.FormValue("barcode_number")
+	product.MetaTitle = r.FormValue("meta_title")
+	product.MetaDescription = r.FormValue("meta_description")
+	product.MetaKeywords = r.FormValue("meta_keywords")
 
-	// 		tax_class,
-	taxClass := r.FormValue("tax_class")
-	if taxClass == "" {
-		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: "Tax class is required"})
-	}
-
-	// 		vat_amount,
-	vatAmount := r.FormValue("vat_amount")
-	vatAmountParsed, err := strconv.ParseFloat(vatAmount, 64)
+	product.Price, err = stringToFloat(r.FormValue("price"))
 	if err != nil {
-		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: "Invalid VAT Amount format"})
+		return parseError(w, "Invalid price format")
 	}
-
-	// 		sku_number,
-	skuNumber := r.FormValue("sku_number")
-	if skuNumber == "" {
-		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: "SKU Number is required"})
-	}
-
-	// 		barcode_number,
-	barcodeNumber := r.FormValue("barcode_number")
-	if barcodeNumber == "" {
-		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: "Barcode Number is required"})
-	}
-
-	// 		on_shelf,
-	onShelf := r.FormValue("on_shelf")
-	onShelfParsed, err := strconv.ParseInt(onShelf, 0, 64)
+	product.VATAmount, err = stringToFloat(r.FormValue("vat_amount"))
 	if err != nil {
-		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: "Invalid on shelf format"})
-	}
-	if onShelfParsed == 0 {
-		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: "Quantity on shelf is required"})
+		return parseError(w, "Invalid vat amount format")
 	}
 
-	// 		on_warehouse,
-	onWarehouse := r.FormValue("on_warehouse")
-	onWarehouseParsed, err := strconv.ParseInt(onWarehouse, 0, 64)
+	product.OnShelf, err = stringToInt(r.FormValue("on_shelf"))
 	if err != nil {
-		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: "Invalid on warehouse format"})
+		return parseError(w, "Invalid on shelf format")
 	}
-
-	// 		allow_backorder,
-	allowBackorder := r.FormValue("allow_backorder")
-	allowBackorderParsed, err := strconv.ParseBool(allowBackorder)
+	product.OnWarehouse, err = stringToInt(r.FormValue("on_warehouse"))
 	if err != nil {
-		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: "Invalid allow backorder format"})
+		return parseError(w, "Invalid on warehouse format")
 	}
 
-	// 		in_physical,
-	inPhysical := r.FormValue("in_physical")
-	inPhysicalParsed, err := strconv.ParseBool(inPhysical)
+	product.AllowBackOrder, err = stringToBool(r.FormValue("allow_backorder"))
 	if err != nil {
-		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: "Invalid in physical format"})
+		return parseError(w, "Invalid allow backorder format")
+	}
+	product.InPhysical, err = stringToBool(r.FormValue("in_physical"))
+	if err != nil {
+		return parseError(w, "Invalide in physical format")
 	}
 
-	// 		meta_title,
-	metaTitle := r.FormValue("meta_title")
+    product.CreatedAt = time.Now().UTC()
 
-	// 		meta_description,
-	metaDescription := r.FormValue("meta_description")
-	
-	// 		meta_keywords,
-	metaKeywords := r.FormValue("meta_keywords")
+    // validation
+	if err := productValidation(product); err != nil {
+		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: err.Error()})
+	}
 
-	product, err := NewProduct(id, fileName, filePath, status, category, tag, template, name, description, discountType, taxClass, skuNumber, barcodeNumber, metaTitle, metaDescription, metaKeywords, priceParsed, vatAmountParsed, onShelfParsed, onWarehouseParsed, allowBackorderParsed, inPhysicalParsed)
+    // create file
+	product.ThumbnailName, product.ThumbnailPath, err = createFile(r, "thumbnail", "uploads")
 	if err != nil {
 		return WriteJSON(w, http.StatusInternalServerError, ApiError{Error: err.Error()})
 	}
 
-	if err := s.store.AddProduct(product); err != nil {
+	// product model
+	newProduct, err := NewProduct(product)
+	if err != nil {
 		return WriteJSON(w, http.StatusInternalServerError, ApiError{Error: err.Error()})
 	}
 
+	// store
+	if err := s.store.AddProduct(newProduct); err != nil {
+		return WriteJSON(w, http.StatusInternalServerError, ApiError{Error: err.Error()})
+	}
+
+	// success
 	return WriteJSON(w, http.StatusCreated, map[string]interface{}{
 		"message": "Product added",
 		"data":    product,
@@ -205,6 +233,38 @@ func (s *APIServer) handleGetProducts(w http.ResponseWriter, _ *http.Request) er
 	return WriteJSON(w, http.StatusOK, map[string]string{
 		"message": "get product",
 	})
+}
+
+// parse error
+func parseError(w http.ResponseWriter, errStr string) error {
+    return WriteJSON(w, http.StatusBadRequest, ApiError{Error: errStr})
+}
+
+// string to float
+func stringToFloat(value string) (float64, error) {
+	valueParsed, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return 0, err
+	}
+	return valueParsed, nil
+}
+
+// string to int
+func stringToInt(value string) (int64, error) {
+	valueParsed, err := strconv.ParseInt(value, 0, 64)
+	if err != nil {
+		return 0, err
+	}
+	return valueParsed, nil
+}
+
+// string to bool
+func stringToBool(value string) (bool, error) {
+	valueParsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, err
+	}
+	return valueParsed, nil
 }
 
 // json output

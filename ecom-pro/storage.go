@@ -139,8 +139,7 @@ func (s *PostgresStore) AddProduct(product *Product) error {
 		meta_title,
 		meta_description,
 		meta_keywords,
-		created_at) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
-	)`
+		created_at) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)`
 	_, err := s.db.Query(
 		query,
 		product.ID,
