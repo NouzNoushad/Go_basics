@@ -1,18 +1,18 @@
 package main
 
 type Media struct {
-	ID            string    `json:"id"`
-	ProductID     string    `json:"product_id"`
-	MediaFilename string    `json:"media_filename"`
-	MediaFilePath string    `json:"media_file_path"`
+	ID            string `json:"id"`
+	ProductID     string `json:"product_id"`
+	MediaFilename string `json:"media_filename"`
+	MediaFilePath string `json:"media_file_path"`
 	CreatedAt     string `json:"created_at"`
 }
 
 type Variation struct {
-	ID            string    `json:"id"`
-	ProductID     string    `json:"product_id"`
-	VariationType string    `json:"variation_type"`
-	VariationTag  string    `json:"variation_tag"`
+	ID            string `json:"id"`
+	ProductID     string `json:"product_id"`
+	VariationType string `json:"variation_type"`
+	VariationTag  string `json:"variation_tag"`
 	CreatedAt     string `json:"created_at"`
 }
 
@@ -81,5 +81,16 @@ func NewMedia(media *Media) (*Media, error) {
 		MediaFilename: media.MediaFilename,
 		MediaFilePath: media.MediaFilePath,
 		CreatedAt:     media.CreatedAt,
+	}, nil
+}
+
+// new variation
+func NewVariation(variation *Variation) (*Variation, error) {
+	return &Variation{
+		ID:            variation.ID,
+		ProductID:     variation.ProductID,
+		VariationType: variation.VariationType,
+		VariationTag:  variation.VariationTag,
+		CreatedAt:     variation.CreatedAt,
 	}, nil
 }

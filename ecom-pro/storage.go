@@ -18,6 +18,7 @@ type Storage interface {
 	AddMedia(*Media) error
 	GetMedias() ([]*Media, error)
 	AddVariation(*Variation) error
+	GetVariations() ([]*Variation, error)
 }
 
 // Postgresql store
@@ -198,7 +199,7 @@ func (s *PostgresStore) AddMedia(media *Media) error {
 
 // Add Variation
 func (s *PostgresStore) AddVariation(variation *Variation) error {
-	query := `insert into media (
+	query := `insert into variation (
 		id, 
 		product_id, 
 		variation_type, 
@@ -283,12 +284,11 @@ func (s *PostgresStore) GetProducts() ([]*Product, error) {
 			return nil, err
 		}
 
-		// Parse created_at manually
-		parsedTime, err := time.Parse("2006-01-02T15:04:05.999999Z", createdAtStr)
+		// parse created_at
+		product.CreatedAt, err = parseTime(createdAtStr)
 		if err != nil {
 			return nil, err
 		}
-		product.CreatedAt = parsedTime.Format(time.RFC3339)
 
 		// unmarshal variations
 		if err := json.Unmarshal(variationsJson, &product.Variations); err != nil {
@@ -323,16 +323,43 @@ func (s *PostgresStore) GetMedias() ([]*Media, error) {
 		}
 
 		// parse createdAt
-		parsedTime, err := time.Parse("2006-01-02T15:04:05.999999Z", createdAtStr)
+		media.CreatedAt, err = parseTime(createdAtStr)
 		if err != nil {
 			return nil, err
 		}
-		media.CreatedAt = parsedTime.Format(time.RFC3339)
 
 		medias = append(medias, media)
 	}
 
 	return medias, nil
+}
+
+// Get Variation
+func (s *PostgresStore) GetVariations() ([]*Variation, error) {
+	query := "select * from variation"
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	variations := []*Variation{}
+	for rows.Next() {
+		variation, createdAtStr, err := scanIntoVariation(rows)
+		if err != nil {
+			return nil, err
+		}
+
+		// parse createdAt
+		variation.CreatedAt, err = parseTime(createdAtStr)
+		if err != nil {
+			return nil, err
+		}
+
+		variations = append(variations, variation)
+	}
+
+	return variations, err
 }
 
 // Get Product by id
@@ -345,6 +372,7 @@ func (s *PostgresStore) DeleteProduct(id int) error {
 	return nil
 }
 
+// scan into product
 func scanIntoProduct(rows *sql.Rows) (*Product, []byte, []byte, string, error) {
 	product := new(Product)
 	var variationsJson, mediaJson []byte
@@ -381,6 +409,7 @@ func scanIntoProduct(rows *sql.Rows) (*Product, []byte, []byte, string, error) {
 	return product, variationsJson, mediaJson, createdAtStr, err
 }
 
+// scan into media
 func scanIntoMedia(rows *sql.Rows) (*Media, string, error) {
 	media := new(Media)
 	var createdAtStr string
@@ -394,4 +423,30 @@ func scanIntoMedia(rows *sql.Rows) (*Media, string, error) {
 	)
 
 	return media, createdAtStr, err
+}
+
+// scan into variation
+func scanIntoVariation(rows *sql.Rows) (*Variation, string, error) {
+	variation := new(Variation)
+	var createdAtStr string
+
+	err := rows.Scan(
+		&variation.ID,
+		&variation.ProductID,
+		&variation.VariationType,
+		&variation.VariationTag,
+		&createdAtStr,
+	)
+
+	return variation, createdAtStr, err
+}
+
+// parse time
+func parseTime(createdAt string) (string, error) {
+	parsedTime, err := time.Parse("2006-01-02T15:04:05.999999Z", createdAt)
+	if err != nil {
+		return "", err
+	}
+
+	return parsedTime.Format(time.RFC3339), nil
 }

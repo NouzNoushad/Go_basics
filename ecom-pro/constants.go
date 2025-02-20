@@ -45,7 +45,7 @@ func isValidTemplate(template string) bool {
 // valid discount type
 func isValidDiscountType(discountType string) bool {
 	switch discountType {
-		case "no discount",
+	case "no discount",
 		"percentage",
 		"fixed price":
 		return true
@@ -64,3 +64,14 @@ func isValidTaxClass(taxClass string) bool {
 	return false
 }
 
+// valid variation type
+func isValidVariationType(variationType string) bool {
+	switch variationType {
+	case "color",
+		"size",
+		"material",
+		"style":
+		return true
+	}
+	return false
+}

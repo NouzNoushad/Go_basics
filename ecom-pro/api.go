@@ -33,6 +33,7 @@ func (s *APIServer) Run() {
 
 	router.HandleFunc("/product", makeHandleFunc(s.handleProduct))
 	router.HandleFunc("/media", makeHandleFunc(s.handleMedia))
+	router.HandleFunc("/variation", makeHandleFunc(s.handleVariation))
 
 	http.ListenAndServe(s.listenAddr, router)
 }
@@ -50,7 +51,7 @@ func (s *APIServer) handleProduct(w http.ResponseWriter, r *http.Request) error 
 	return fmt.Errorf("method not allowed %s", r.Method)
 }
 
-// handle request methods (medi)
+// handle request methods (media)
 func (s *APIServer) handleMedia(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "GET" {
 		return s.handleGetMedias(w, r)
@@ -58,6 +59,19 @@ func (s *APIServer) handleMedia(w http.ResponseWriter, r *http.Request) error {
 
 	if r.Method == "POST" {
 		return s.handleAddMedia(w, r)
+	}
+
+	return fmt.Errorf("method not allowed %s", r.Method)
+}
+
+// handle request methods (variation)
+func (s *APIServer) handleVariation(w http.ResponseWriter, r *http.Request) error {
+	if r.Method == "GET" {
+		return s.handleGetVariations(w, r)
+	}
+
+	if r.Method == "POST" {
+		return s.handleAddVariation(w, r)
 	}
 
 	return fmt.Errorf("method not allowed %s", r.Method)
@@ -132,6 +146,26 @@ func mediaValidation(media *Media) error {
 	// product id,
 	if media.ProductID == "" {
 		return validationError("Product ID is required")
+	}
+
+	return nil
+}
+
+// varaition validation
+func variationValidation(variation *Variation) error {
+	// product id,
+	if variation.ProductID == "" {
+		return validationError("Product ID is required")
+	}
+
+	// valid varaiation type
+	if !isValidVariationType(variation.VariationType) {
+		return validationError("Invalid variation type")
+	}
+
+	// variation tag
+	if variation.VariationTag == "" {
+		return validationError("Varaition tag is required")
 	}
 
 	return nil
@@ -323,6 +357,59 @@ func (s *APIServer) handleGetMedias(w http.ResponseWriter, _ *http.Request) erro
 	return WriteJSON(w, http.StatusOK, map[string]interface{}{
 		"data":  medias,
 		"items": fmt.Sprintf("%d items", len(medias)),
+	})
+}
+
+// handle add variaton
+func (s *APIServer) handleAddVariation(w http.ResponseWriter, r *http.Request) error {
+	variation := new(Variation)
+
+	// parse multipart form
+	err := r.ParseMultipartForm(10 << 20)
+	if err != nil {
+		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: "Failed to parse form"})
+	}
+
+	variation.ID = uuid.New().String()
+	variation.ProductID = r.FormValue("product_id")
+	variation.VariationType = r.FormValue("variation_type")
+	variation.VariationTag = r.FormValue("variation_tag")
+	variation.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+
+	// validation
+	if err := variationValidation(variation); err != nil {
+		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: err.Error()})
+	}
+
+	// variation model
+	NewVariation, err := NewVariation(variation)
+	if err != nil {
+		return WriteJSON(w, http.StatusInternalServerError, ApiError{Error: err.Error()})
+	}
+
+	// store
+	if err := s.store.AddVariation(NewVariation); err != nil {
+		return WriteJSON(w, http.StatusInternalServerError, ApiError{Error: err.Error()})
+	}
+
+	// success
+	return WriteJSON(w, http.StatusCreated, map[string]interface{}{
+		"message": "Variation added",
+		"data":    variation,
+	})
+}
+
+// handle get variations
+func (s *APIServer) handleGetVariations(w http.ResponseWriter, r *http.Request) error {
+	variations, err := s.store.GetVariations()
+	if err != nil {
+		return err
+	}
+
+	// success
+	return WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"data":  variations,
+		"items": fmt.Sprintf("%d items", len(variations)),
 	})
 }
 
