@@ -11,8 +11,9 @@ import (
 
 // Interface
 type Storage interface {
+
 	// product
-	AddProduct(*Product) error
+	AddProductTransaction(*Product, []byte, []*Media) error
 	EditProduct(string, *Product) error
 	GetProducts() ([]*Product, error)
 	GetProductByID(string) (*Product, error)
@@ -22,11 +23,6 @@ type Storage interface {
 	GetMedias() ([]*Media, error)
 	GetMediaByID(string) (*Media, error)
 	DeleteMedia(string) error
-	// variation
-	AddVariation(*Variation) error
-	GetVariations() ([]*Variation, error)
-	GetVariationByID(string) (*Variation, error)
-	DeleteVariation(string) error
 }
 
 // Postgresql store
@@ -36,7 +32,7 @@ type PostgresStore struct {
 
 // Set up database
 func NewPostgresStore() (*PostgresStore, error) {
-	connStr := "host=localhost user=postgres password=noushad dbname=ecom-pro port=5432 sslmode=disable"
+	connStr := "host=localhost user=postgres password=noushad dbname=ecom-pros port=5432 sslmode=disable"
 
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
@@ -58,11 +54,7 @@ func (s *PostgresStore) InitDB() error {
 		return err
 	}
 
-	if err := s.createMediaTable(); err != nil {
-		return err
-	}
-
-	return s.createVariationTable()
+	return s.createMediaTable()
 }
 
 // Set up product table
@@ -90,6 +82,7 @@ func (s *PostgresStore) createProductTable() error {
 		meta_title text,
 		meta_description text,
 		meta_keywords text,
+		variations jsonb,
 		created_at timestamp default now()
 	)`
 
@@ -109,77 +102,6 @@ func (s *PostgresStore) createMediaTable() error {
 	)`
 
 	_, err := s.db.Exec(query)
-
-	return err
-}
-
-// Set up media table
-func (s *PostgresStore) createVariationTable() error {
-	query := `create table if not exists variation(
-		id text primary key,
-		product_id text references product(id) on delete cascade,
-		variation_type text,
-		variation_tag text,
-		created_at timestamp default now()
-	)`
-
-	_, err := s.db.Exec(query)
-
-	return err
-}
-
-// Add Product
-func (s *PostgresStore) AddProduct(product *Product) error {
-	query := `insert into product (
-		id,
-		thumbnail_name,
-		thumbnail_path,
-		status,
-		category,
-		tag,
-		template,
-		name,
-		description,
-		price,
-		discount_type,
-		tax_class,
-		vat_amount,
-		sku_number,
-		barcode_number,
-		on_shelf,
-		on_warehouse,
-		allow_backorder,
-		in_physical,
-		meta_title,
-		meta_description,
-		meta_keywords,
-		created_at) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)`
-	_, err := s.db.Query(
-		query,
-		product.ID,
-		product.ThumbnailName,
-		product.ThumbnailPath,
-		product.Status,
-		product.Category,
-		product.Tag,
-		product.Template,
-		product.Name,
-		product.Description,
-		product.Price,
-		product.DiscountType,
-		product.TaxClass,
-		product.VATAmount,
-		product.SKUNumber,
-		product.BarcodeNumber,
-		product.OnShelf,
-		product.OnWarehouse,
-		product.AllowBackOrder,
-		product.InPhysical,
-		product.MetaTitle,
-		product.MetaDescription,
-		product.MetaKeywords,
-		product.CreatedAt,
-	)
 
 	return err
 }
@@ -205,25 +127,111 @@ func (s *PostgresStore) AddMedia(media *Media) error {
 	return err
 }
 
-// Add Variation
-func (s *PostgresStore) AddVariation(variation *Variation) error {
-	query := `insert into variation (
-		id, 
-		product_id, 
-		variation_type, 
-		variation_tag, 
-		created_at) values ($1, $2, $3, $4, $5)`
+// Add Produt Transaction
+func (s *PostgresStore) AddProductTransaction(product *Product, variations []byte, medias []*Media) error {
 
-	_, err := s.db.Query(
+	// begin new transaction
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	// insert product
+	query := `insert into product (
+		id,
+		thumbnail_name,
+		thumbnail_path,
+		status,
+		category,
+		tag,
+		template,
+		name,
+		description,
+		price,
+		discount_type,
+		tax_class,
+		vat_amount,
+		sku_number,
+		barcode_number,
+		on_shelf,
+		on_warehouse,
+		allow_backorder,
+		in_physical,
+		meta_title,
+		meta_description,
+		meta_keywords,
+		variations,
+		created_at) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)`
+
+	_, err = tx.Exec(
 		query,
-		variation.ID,
-		variation.ProductID,
-		variation.VariationType,
-		variation.VariationTag,
-		variation.CreatedAt,
+		product.ID,
+		product.ThumbnailName,
+		product.ThumbnailPath,
+		product.Status,
+		product.Category,
+		product.Tag,
+		product.Template,
+		product.Name,
+		product.Description,
+		product.Price,
+		product.DiscountType,
+		product.TaxClass,
+		product.VATAmount,
+		product.SKUNumber,
+		product.BarcodeNumber,
+		product.OnShelf,
+		product.OnWarehouse,
+		product.AllowBackOrder,
+		product.InPhysical,
+		product.MetaTitle,
+		product.MetaDescription,
+		product.MetaKeywords,
+		variations,
+		product.CreatedAt,
 	)
 
-	return err
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to insert product: %v", err)
+	}
+
+	// insert media
+	if len(medias) > 0 {
+		mediaQuery := `insert into media (
+			id, 
+			product_id, 
+			media_filename, 
+			media_file_path, 
+			created_at) values ($1, $2, $3, $4, $5)`
+		stmt, err := tx.Prepare(mediaQuery)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to prepare media insert: %v", err)
+		}
+		defer stmt.Close()
+
+		for _, media := range medias {
+			_, err := stmt.Exec(
+				media.ID,
+				product.ID,
+				media.MediaFilename,
+				media.MediaFilePath,
+				media.CreatedAt,
+			)
+			if err != nil {
+				tx.Rollback()
+				return fmt.Errorf("failed to insert media: %v", err)
+			}
+		}
+	}
+
+	// commit transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %v", err)
+	}
+
+	return nil
 }
 
 // Edit Product
@@ -257,14 +265,8 @@ func (s *PostgresStore) GetProducts() ([]*Product, error) {
 			p.meta_title,
 			p.meta_description,
 			p.meta_keywords,
+			p.variations,
 			to_char(p.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at,
-
-			coalesce(jsonb_agg(distinct jsonb_build_object(
-				'id', v.id,
-				'variation_type', v.variation_type,
-				'variation_tag', v.variation_tag,
-				'created_at', to_char(v.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
-			)) filter (where v.id is not null), '[]'::jsonb) as variations,
 
 			coalesce(jsonb_agg(distinct jsonb_build_object(
 				'id', m.id,
@@ -274,7 +276,6 @@ func (s *PostgresStore) GetProducts() ([]*Product, error) {
 			)) filter (where m.id is not null), '[]'::jsonb) as media
 		
 		from product p
-		left join variation v on p.id = v.product_id
 		left join media m on p.id = m.product_id
 		group by p.id
 	`
@@ -299,7 +300,8 @@ func (s *PostgresStore) GetProducts() ([]*Product, error) {
 		}
 
 		// unmarshal variations
-		if err := json.Unmarshal(variationsJson, &product.Variations); err != nil {
+		var variations map[string][]string
+		if err := json.Unmarshal(variationsJson, &variations); err != nil {
 			return nil, err
 		}
 
@@ -308,6 +310,7 @@ func (s *PostgresStore) GetProducts() ([]*Product, error) {
 			return nil, err
 		}
 
+		product.Variations = variations
 		products = append(products, product)
 	}
 
@@ -342,34 +345,6 @@ func (s *PostgresStore) GetMedias() ([]*Media, error) {
 	return medias, nil
 }
 
-// Get Variation
-func (s *PostgresStore) GetVariations() ([]*Variation, error) {
-	query := "select * from variation"
-	rows, err := s.db.Query(query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	variations := []*Variation{}
-	for rows.Next() {
-		variation, createdAtStr, err := scanIntoVariation(rows)
-		if err != nil {
-			return nil, err
-		}
-
-		// parse createdAt
-		variation.CreatedAt, err = parseTime(createdAtStr)
-		if err != nil {
-			return nil, err
-		}
-
-		variations = append(variations, variation)
-	}
-
-	return variations, err
-}
-
 // Get Product by id
 func (s *PostgresStore) GetProductByID(id string) (*Product, error) {
 	query := `
@@ -396,14 +371,8 @@ func (s *PostgresStore) GetProductByID(id string) (*Product, error) {
 			p.meta_title,
 			p.meta_description,
 			p.meta_keywords,
+			p.variations,
 			to_char(p.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at,
-
-			coalesce(jsonb_agg(distinct jsonb_build_object(
-				'id', v.id,
-				'variation_type', v.variation_type,
-				'variation_tag', v.variation_tag,
-				'created_at', to_char(v.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
-			)) filter (where v.id is not null), '[]'::jsonb) as variations,
 
 			coalesce(jsonb_agg(distinct jsonb_build_object(
 				'id', m.id,
@@ -413,7 +382,6 @@ func (s *PostgresStore) GetProductByID(id string) (*Product, error) {
 			)) filter (where m.id is not null), '[]'::jsonb) as media
 		
 		from product p
-		left join variation v on p.id = v.product_id
 		left join media m on p.id = m.product_id
 		where p.id = $1
 		group by p.id
@@ -421,7 +389,7 @@ func (s *PostgresStore) GetProductByID(id string) (*Product, error) {
 
 	row := s.db.QueryRow(query, id)
 
-	product, variationJson, mediaJson, createdAtStr, err := scanIntoProduct(row)
+	product, variationsJson, mediaJson, createdAtStr, err := scanIntoProduct(row)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("product with id [%s] not found", id)
@@ -435,8 +403,9 @@ func (s *PostgresStore) GetProductByID(id string) (*Product, error) {
 		return nil, err
 	}
 
-	// unmarshal variation
-	if err := json.Unmarshal(variationJson, &product.Variations); err != nil {
+	// unmarshal variations
+	var variations map[string][]string
+	if err := json.Unmarshal(variationsJson, &variations); err != nil {
 		return nil, err
 	}
 
@@ -444,6 +413,8 @@ func (s *PostgresStore) GetProductByID(id string) (*Product, error) {
 	if err := json.Unmarshal(mediaJson, &product.Media); err != nil {
 		return nil, err
 	}
+
+	product.Variations = variations
 
 	return product, nil
 
@@ -470,27 +441,6 @@ func (s *PostgresStore) GetMediaByID(id string) (*Media, error) {
 	return media, nil
 }
 
-// Get Variation by id
-func (s *PostgresStore) GetVariationByID(id string) (*Variation, error) {
-	query := "select * from variation where id = $1"
-	row := s.db.QueryRow(query, id)
-
-	variation, createdAtStr, err := scanIntoVariation(row)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("variation with id [%s] not found", id)
-		}
-		return nil, err
-	}
-
-	variation.CreatedAt, err = parseTime(createdAtStr)
-	if err != nil {
-		return nil, err
-	}
-
-	return variation, nil
-}
-
 // Delete Product
 func (s *PostgresStore) DeleteProduct(id string) error {
 	return nil
@@ -501,11 +451,6 @@ func (s *PostgresStore) DeleteMedia(id string) error {
 	return nil
 }
 
-// Delete Variation
-func (s *PostgresStore) DeleteVariation(id string) error {
-	return nil
-}
-
 type scannable interface {
 	Scan(dest ...interface{}) error
 }
@@ -513,8 +458,9 @@ type scannable interface {
 // scan into product
 func scanIntoProduct(scanner scannable) (*Product, []byte, []byte, string, error) {
 	product := new(Product)
-	var variationsJson, mediaJson []byte
+	var mediaJson []byte
 	var createdAtStr string
+	var variationsJson []byte
 
 	err := scanner.Scan(
 		&product.ID,
@@ -539,8 +485,8 @@ func scanIntoProduct(scanner scannable) (*Product, []byte, []byte, string, error
 		&product.MetaTitle,
 		&product.MetaDescription,
 		&product.MetaKeywords,
-		&createdAtStr,
 		&variationsJson,
+		&createdAtStr,
 		&mediaJson,
 	)
 
@@ -561,22 +507,6 @@ func scanIntoMedia(scanner scannable) (*Media, string, error) {
 	)
 
 	return media, createdAtStr, err
-}
-
-// scan into variation
-func scanIntoVariation(scanner scannable) (*Variation, string, error) {
-	variation := new(Variation)
-	var createdAtStr string
-
-	err := scanner.Scan(
-		&variation.ID,
-		&variation.ProductID,
-		&variation.VariationType,
-		&variation.VariationTag,
-		&createdAtStr,
-	)
-
-	return variation, createdAtStr, err
 }
 
 // parse time
