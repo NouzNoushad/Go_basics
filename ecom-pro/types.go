@@ -35,14 +35,3 @@ type Product struct {
 	Media           []*Media            `json:"media"`
 	CreatedAt       string              `json:"created_at"`
 }
-
-// new media
-func NewMedia(media *Media) (*Media, error) {
-	return &Media{
-		ID:            media.ID,
-		ProductID:     media.ProductID,
-		MediaFilename: media.MediaFilename,
-		MediaFilePath: media.MediaFilePath,
-		CreatedAt:     media.CreatedAt,
-	}, nil
-}

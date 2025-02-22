@@ -59,6 +59,10 @@ func (s *APIServer) handleProductByID(w http.ResponseWriter, r *http.Request) er
 		return s.handleGetProductByID(w, r)
 	}
 
+	if r.Method == "DELETE" {
+		return s.handleDeleteProduct(w, r)
+	}
+
 	return fmt.Errorf("method not allowed %s", r.Method)
 }
 
@@ -358,6 +362,43 @@ func (s *APIServer) handleGetProductByID(w http.ResponseWriter, r *http.Request)
 	})
 }
 
+// handle delete product
+func (s *APIServer) handleDeleteProduct(w http.ResponseWriter, r *http.Request) error {
+
+	id := getID(r)
+
+    product, err := s.store.GetProductByID(id)
+	if err != nil {
+		return err
+	}
+
+    medias, err := s.store.GetMediasByProductID(id)
+    if err != nil {
+        return err
+    }
+
+    // remove thumbnail from uploads
+    if err := os.Remove(product.ThumbnailPath); err != nil {
+        return err
+    }
+
+    // remove images from medias
+    for _, media := range medias {
+        if err := os.Remove(media.MediaFilePath); err != nil {
+            return err
+        }
+    }
+
+	if err := s.store.DeleteProduct(id); err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"message": "product deleted",
+		"id":      id,
+	})
+}
+
 // handle add media
 func (s *APIServer) handleAddMedia(w http.ResponseWriter, r *http.Request) error {
 	media := new(Media)
@@ -384,14 +425,8 @@ func (s *APIServer) handleAddMedia(w http.ResponseWriter, r *http.Request) error
 		return WriteJSON(w, http.StatusInternalServerError, ApiError{Error: err.Error()})
 	}
 
-	// media model
-	newMedia, err := NewMedia(media)
-	if err != nil {
-		return WriteJSON(w, http.StatusInternalServerError, ApiError{Error: err.Error()})
-	}
-
 	// store
-	if err := s.store.AddMedia(newMedia); err != nil {
+	if err := s.store.AddMedia(media); err != nil {
 		return WriteJSON(w, http.StatusInternalServerError, ApiError{Error: err.Error()})
 	}
 

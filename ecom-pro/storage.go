@@ -25,6 +25,7 @@ type Storage interface {
 	AddMedia(*Media) error
 	GetMedias() ([]*Media, error)
 	GetMediaByID(string) (*Media, error)
+	GetMediasByProductID(string) ([]*Media, error)
 	DeleteMedia(string) error
 }
 
@@ -40,7 +41,7 @@ func NewPostgresStore() (*PostgresStore, error) {
 	if envErr != nil {
 		log.Fatal("Error loading .env file")
 	}
-	
+
 	connStr := fmt.Sprintf(
 		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
 		os.Getenv("DB_HOST"),
@@ -457,14 +458,48 @@ func (s *PostgresStore) GetMediaByID(id string) (*Media, error) {
 	return media, nil
 }
 
+// Get Media by product id
+func (s *PostgresStore) GetMediasByProductID(productId string) ([]*Media, error) {
+	query := "select * from media where product_id = $1"
+	rows, err := s.db.Query(query, productId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	medias := []*Media{}
+	for rows.Next() {
+		media, createdAtStr, err := scanIntoMedia(rows)
+		if err != nil {
+			return nil, err
+		}
+
+		// parse createdAt
+		media.CreatedAt, err = parseTime(createdAtStr)
+		if err != nil {
+			return nil, err
+		}
+
+		medias = append(medias, media)
+	}
+
+	return medias, nil
+}
+
 // Delete Product
 func (s *PostgresStore) DeleteProduct(id string) error {
-	return nil
+	query := "delete from product where id = $1"
+	_, err := s.db.Query(query, id)
+
+	return err
 }
 
 // Delete Media
 func (s *PostgresStore) DeleteMedia(id string) error {
-	return nil
+	query := "delete from media where id = $1"
+	_, err := s.db.Query(query, id)
+
+	return err
 }
 
 type scannable interface {
