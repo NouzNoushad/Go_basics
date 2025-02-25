@@ -28,6 +28,29 @@ func NewAPIServer(listenAdr string, store Storage) *APIServer {
 	}
 }
 
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Set CORS headers
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Expose-Headers", "Content-Length")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+
+		// Handle OPTIONS method (preflight request)
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func Static(r *mux.Router, pathPrefix string, dir string) {
+	r.PathPrefix(pathPrefix).Handler(http.StripPrefix(pathPrefix, http.FileServer(http.Dir(dir))))
+}
+
 // router
 func (s *APIServer) Run() {
 	router := mux.NewRouter()
@@ -37,7 +60,10 @@ func (s *APIServer) Run() {
 	router.HandleFunc("/media", makeHandleFunc(s.handleMedia))
 	router.HandleFunc("/media/{id}", makeHandleFunc(s.handleMediaByID))
 
-	http.ListenAndServe(s.listenAddr, router)
+	Static(router, "/uploads/", "./uploads")
+	Static(router, "/medias/", "./medias")
+
+	http.ListenAndServe(s.listenAddr, corsMiddleware(router))
 }
 
 // handle request methods (product)
@@ -367,27 +393,27 @@ func (s *APIServer) handleDeleteProduct(w http.ResponseWriter, r *http.Request) 
 
 	id := getID(r)
 
-    product, err := s.store.GetProductByID(id)
+	product, err := s.store.GetProductByID(id)
 	if err != nil {
 		return err
 	}
 
-    medias, err := s.store.GetMediasByProductID(id)
-    if err != nil {
-        return err
-    }
+	medias, err := s.store.GetMediasByProductID(id)
+	if err != nil {
+		return err
+	}
 
-    // remove thumbnail from uploads
-    if err := os.Remove(product.ThumbnailPath); err != nil {
-        return err
-    }
+	// remove thumbnail from uploads
+	if err := os.Remove(product.ThumbnailPath); err != nil {
+		return err
+	}
 
-    // remove images from medias
-    for _, media := range medias {
-        if err := os.Remove(media.MediaFilePath); err != nil {
-            return err
-        }
-    }
+	// remove images from medias
+	for _, media := range medias {
+		if err := os.Remove(media.MediaFilePath); err != nil {
+			return err
+		}
+	}
 
 	if err := s.store.DeleteProduct(id); err != nil {
 		return err

@@ -295,6 +295,7 @@ func (s *PostgresStore) GetProducts() ([]*Product, error) {
 		from product p
 		left join media m on p.id = m.product_id
 		group by p.id
+		order by created_at desc
 	`
 	rows, err := s.db.Query(query)
 	if err != nil {
