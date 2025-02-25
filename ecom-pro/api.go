@@ -121,37 +121,37 @@ func validationError(err string) error {
 
 // product validation
 func productValidation(product *Product) error {
-	// status,
+	// status
 	if !isValidStatus(product.Status) {
 		return validationError("Invalid status")
 	}
 
-	// category,
+	// category
 	if !isValidCategory(product.Category) {
 		return validationError("Invalid category")
 	}
 
-	// template,
+	// template
 	if !isValidTemplate(product.Template) {
 		return validationError("Invalid template")
 	}
 
-	// name,
+	// name
 	if product.Name == "" {
 		return validationError("Name is required")
 	}
 
-	// price,
+	// price
 	if product.Price == 0 {
 		return validationError("Price is required and should not be zero")
 	}
 
-	// discount_type,
+	// discount_type
 	if !isValidDiscountType(product.DiscountType) {
 		return validationError("Invalid discount type")
 	}
 
-	// tax_class,
+	// tax_class
 	if product.TaxClass == "" {
 		return validationError("Tax class is required")
 	}
@@ -159,17 +159,17 @@ func productValidation(product *Product) error {
 		return validationError("Invalid tax class")
 	}
 
-	// sku_number,
+	// sku_number
 	if product.SKUNumber == "" {
 		return validationError("SKU Number is required")
 	}
 
-	// barcode_number,
+	// barcode_number
 	if product.BarcodeNumber == "" {
 		return validationError("Barcode Number is required")
 	}
 
-	// on_shelf,
+	// on_shelf
 	if product.OnShelf == 0 {
 		return validationError("Quantity on shelf is required")
 	}
@@ -180,7 +180,7 @@ func productValidation(product *Product) error {
 // media validation
 func mediaValidation(media *Media) error {
 
-	// product id,
+	// product id
 	if media.ProductID == "" {
 		return validationError("Product ID is required")
 	}
