@@ -85,6 +85,10 @@ func (s *APIServer) handleProductByID(w http.ResponseWriter, r *http.Request) er
 		return s.handleGetProductByID(w, r)
 	}
 
+	if r.Method == "PUT" {
+		return s.handleEditProduct(w, r)
+	}
+
 	if r.Method == "DELETE" {
 		return s.handleDeleteProduct(w, r)
 	}
@@ -228,7 +232,7 @@ func (s *APIServer) handleAddProduct(w http.ResponseWriter, r *http.Request) err
 	// parse multipart form
 	err := r.ParseMultipartForm(10 << 20)
 	if err != nil {
-		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: "Failed to parse form"})
+		return badRequestError(w, "Failed to parse form")
 	}
 
 	product.ID = uuid.New().String()
@@ -248,29 +252,29 @@ func (s *APIServer) handleAddProduct(w http.ResponseWriter, r *http.Request) err
 
 	product.Price, err = stringToFloat(r.FormValue("price"))
 	if err != nil {
-		return parseError(w, "Invalid price format")
+		return badRequestError(w, "Invalid price format")
 	}
 	product.VATAmount, err = stringToFloat(r.FormValue("vat_amount"))
 	if err != nil {
-		return parseError(w, "Invalid vat amount format")
+		return badRequestError(w, "Invalid vat amount format")
 	}
 
 	product.OnShelf, err = stringToInt(r.FormValue("on_shelf"))
 	if err != nil {
-		return parseError(w, "Invalid on shelf format")
+		return badRequestError(w, "Invalid on shelf format")
 	}
 	product.OnWarehouse, err = stringToInt(r.FormValue("on_warehouse"))
 	if err != nil {
-		return parseError(w, "Invalid on warehouse format")
+		return badRequestError(w, "Invalid on warehouse format")
 	}
 
 	product.AllowBackOrder, err = stringToBool(r.FormValue("allow_backorder"))
 	if err != nil {
-		return parseError(w, "Invalid allow backorder format")
+		return badRequestError(w, "Invalid allow backorder format")
 	}
 	product.InPhysical, err = stringToBool(r.FormValue("in_physical"))
 	if err != nil {
-		return parseError(w, "Invalide in physical format")
+		return badRequestError(w, "Invalide in physical format")
 	}
 
 	product.CreatedAt = time.Now().UTC().Format(time.RFC3339)
@@ -283,7 +287,7 @@ func (s *APIServer) handleAddProduct(w http.ResponseWriter, r *http.Request) err
 	// create file
 	product.ThumbnailName, product.ThumbnailPath, err = createFile(r, "thumbnail", "uploads")
 	if err != nil {
-		return WriteJSON(w, http.StatusInternalServerError, ApiError{Error: err.Error()})
+		return serverError(w, err.Error())
 	}
 
 	// variation model
@@ -349,7 +353,7 @@ func (s *APIServer) handleAddProduct(w http.ResponseWriter, r *http.Request) err
 
 	// store
 	if err := s.store.AddProductTransaction(product, variationJson, uploadedMedias); err != nil {
-		return WriteJSON(w, http.StatusInternalServerError, ApiError{Error: err.Error()})
+		return serverError(w, err.Error())
 	}
 
 	// success
@@ -385,6 +389,261 @@ func (s *APIServer) handleGetProductByID(w http.ResponseWriter, r *http.Request)
 
 	return WriteJSON(w, http.StatusOK, map[string]interface{}{
 		"data": product,
+	})
+}
+
+// handl edit product
+func (s *APIServer) handleEditProduct(w http.ResponseWriter, r *http.Request) error {
+
+	id := getID(r)
+
+    // parse multipart form
+	err := r.ParseMultipartForm(10 << 20)
+	if err != nil {
+		return badRequestError(w, "Failed to parse form")
+	}
+
+	product, err := s.store.GetProductByID(id)
+	if err != nil {
+		return err
+	}
+
+	status := r.FormValue("status")
+	if status != "" {
+		if !isValidStatus(status) {
+			return badRequestError(w, "Invalid status")
+		}
+		product.Status = status
+	}
+
+	category := r.FormValue("category")
+	if category != "" {
+		if !isValidCategory(category) {
+			return badRequestError(w, "Invalid category")
+		}
+		product.Category = category
+	}
+
+	tag := r.FormValue("tag")
+	if tag != "" {
+		product.Tag = tag
+	}
+
+	template := r.FormValue("template")
+	if template != "" {
+		if !isValidTemplate(template) {
+			return badRequestError(w, "Invalid template")
+		}
+		product.Template = template
+	}
+    
+	name := r.FormValue("name")
+	if name != "" {
+		product.Name = name
+	}
+
+	description := r.FormValue("description")
+	if description != "" {
+		product.Description = description
+	}
+
+	discountType := r.FormValue("discount_type")
+	if discountType != "" {
+		if !isValidDiscountType(discountType) {
+			return badRequestError(w, "Invalid discount type")
+		}
+		product.DiscountType = discountType
+	}
+
+	taxClass := r.FormValue("tax_class")
+	if taxClass != "" {
+		if !isValidTaxClass(taxClass) {
+			return badRequestError(w, "Invalid tax class")
+		}
+		product.TaxClass = taxClass
+	}
+
+	skuNumber := r.FormValue("sku_number")
+	if skuNumber != "" {
+		product.SKUNumber = skuNumber
+	}
+
+	barcodeNumber := r.FormValue("barcode_number")
+	if barcodeNumber != "" {
+		product.BarcodeNumber = barcodeNumber
+	}
+
+	metaTitle := r.FormValue("meta_title")
+	if metaTitle != "" {
+		product.MetaTitle = metaTitle
+	}
+
+	metaDescription := r.FormValue("meta_description")
+	if metaDescription != "" {
+		product.MetaDescription = metaDescription
+	}
+
+	metaKeywords := r.FormValue("meta_keywords")
+	if metaKeywords != "" {
+		product.MetaKeywords = metaKeywords
+	}
+
+	price := r.FormValue("price")
+	if price != "" {
+		priceParsed, err := stringToFloat(price)
+		if err != nil {
+			return badRequestError(w, "Invalid price format")
+		}
+		product.Price = priceParsed
+	}
+
+	vatAmount := r.FormValue("vat_amount")
+	if vatAmount != "" {
+		vatAmountParsed, err := stringToFloat(vatAmount)
+		if err != nil {
+			return badRequestError(w, "Invalid vat amount format")
+		}
+		product.VATAmount = vatAmountParsed
+	}
+
+	onShelf := r.FormValue("on_shelf")
+	if onShelf != "" {
+		onShelfParsed, err := stringToInt(onShelf)
+		if err != nil {
+			return badRequestError(w, "Invalid on shelf format")
+		}
+		product.OnShelf = onShelfParsed
+	}
+
+	onWarehouse := r.FormValue("on_warehouse")
+	if onWarehouse != "" {
+		onWarehouseParsed, err := stringToInt(onWarehouse)
+		if err != nil {
+			return badRequestError(w, "Invalid on warehouse format")
+		}
+		product.OnWarehouse = onWarehouseParsed
+	}
+
+	allowBackorder := r.FormValue("allow_backorder")
+	if allowBackorder != "" {
+		allowBackorderParsed, err := stringToBool(allowBackorder)
+		if err != nil {
+			return badRequestError(w, "Invalid allow backorder format")
+		}
+		product.AllowBackOrder = allowBackorderParsed
+	}
+
+	inPhysical := r.FormValue("in_physical")
+	if inPhysical != "" {
+		inPhysicalParsed, err := stringToBool(inPhysical)
+		if err != nil {
+			return badRequestError(w, "Invalid in physical format")
+		}
+		product.InPhysical = inPhysicalParsed
+	}
+
+	// thumbnail
+	file, fileHeader, err := r.FormFile("thumbnail")
+	if err == nil {
+		// remove file
+		if err := os.Remove(product.ThumbnailPath); err != nil {
+			return serverError(w, "Failed to delete old file")
+		}
+
+		// save file
+		uploadDir := "uploads"
+		fileName := uuid.New().String() + "_" + fileHeader.Filename
+		filePath := filepath.Join(uploadDir, fileName)
+		outFile, err := os.Create(filePath)
+		if err != nil {
+			return serverError(w, "Failed to save file")
+		}
+		defer outFile.Close()
+
+		// copy file contents
+		_, err = io.Copy(outFile, file)
+		if err != nil {
+			return serverError(w, "Failed to copy file")
+		}
+	}
+
+	// variation model
+	color := r.FormValue("color")
+	size := r.FormValue("size")
+	material := r.FormValue("material")
+	style := r.FormValue("style")
+
+	if color != "" {
+		product.Variations["color"] = splitValues(color)
+	}
+	if size != "" {
+		product.Variations["size"] = splitValues(size)
+	}
+	if material != "" {
+		product.Variations["material"] = splitValues(material)
+	}
+	if style != "" {
+		product.Variations["style"] = splitValues(style)
+	}
+
+	// convert attr map to json
+	variationJson, err := json.Marshal(product.Variations)
+	if err != nil {
+		return serverError(w, err.Error())
+	}
+
+	// medias
+	files := r.MultipartForm.File["media_files"]
+
+	uploadedMedias := []*Media{}
+
+	mediaDir := "medias"
+
+	for _, fileHeader := range files {
+		media := new(Media)
+		media.ID = uuid.New().String()
+		media.ProductID = product.ID
+		media.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+
+		file, err := fileHeader.Open()
+		if err != nil {
+			return serverError(w, "Failed to open file")
+		}
+		defer file.Close()
+
+		// save file
+		fileName := uuid.New().String() + "_" + fileHeader.Filename
+		filePath := filepath.Join(mediaDir, fileName)
+
+		outFile, err := os.Create(filePath)
+		if err != nil {
+			return serverError(w, "Failed to save file")
+		}
+		defer outFile.Close()
+
+		// copy file contents
+		_, err = io.Copy(outFile, file)
+		if err != nil {
+			return serverError(w, "Failed to copy file")
+		}
+
+		media.MediaFilename = fileName
+		media.MediaFilePath = filePath
+
+		uploadedMedias = append(uploadedMedias, media)
+	}
+
+	product.Media = uploadedMedias
+
+	// store
+	if err := s.store.EditProduct(id, product, variationJson, uploadedMedias); err != nil {
+		return serverError(w, err.Error())
+	}
+
+	// success
+	return WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"message": "Product updated",
+		"data":    product,
 	})
 }
 
@@ -432,7 +691,7 @@ func (s *APIServer) handleAddMedia(w http.ResponseWriter, r *http.Request) error
 	// parse multipart form
 	err := r.ParseMultipartForm(10 << 20)
 	if err != nil {
-		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: "Failed to parse form"})
+		return badRequestError(w, "Failed to parse form")
 	}
 
 	media.ID = uuid.New().String()
@@ -442,18 +701,18 @@ func (s *APIServer) handleAddMedia(w http.ResponseWriter, r *http.Request) error
 
 	// validation
 	if err := mediaValidation(media); err != nil {
-		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: err.Error()})
+		return badRequestError(w, err.Error())
 	}
 
 	// create file
 	media.MediaFilename, media.MediaFilePath, err = createFile(r, "media_image", "medias")
 	if err != nil {
-		return WriteJSON(w, http.StatusInternalServerError, ApiError{Error: err.Error()})
+		return serverError(w, err.Error())
 	}
 
 	// store
 	if err := s.store.AddMedia(media); err != nil {
-		return WriteJSON(w, http.StatusInternalServerError, ApiError{Error: err.Error()})
+		return serverError(w, err.Error())
 	}
 
 	// success
@@ -514,8 +773,13 @@ func getID(r *http.Request) string {
 }
 
 // parse error
-func parseError(w http.ResponseWriter, errStr string) error {
+func badRequestError(w http.ResponseWriter, errStr string) error {
 	return WriteJSON(w, http.StatusBadRequest, ApiError{Error: errStr})
+}
+
+// server error
+func serverError(w http.ResponseWriter, errStr string) error {
+	return WriteJSON(w, http.StatusInternalServerError, ApiError{Error: errStr})
 }
 
 // string to float

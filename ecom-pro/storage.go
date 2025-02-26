@@ -17,7 +17,7 @@ type Storage interface {
 
 	// product
 	AddProductTransaction(*Product, []byte, []*Media) error
-	EditProduct(string, *Product) error
+	EditProduct(string, *Product, []byte, []*Media) error
 	GetProducts() ([]*Product, error)
 	GetProductByID(string) (*Product, error)
 	DeleteProduct(string) error
@@ -252,7 +252,98 @@ func (s *PostgresStore) AddProductTransaction(product *Product, variations []byt
 }
 
 // Edit Product
-func (s *PostgresStore) EditProduct(id string, product *Product) error {
+func (s *PostgresStore) EditProduct(id string, product *Product, variations []byte, medias []*Media) error {
+	// begin transaction
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	// insert product
+	query := `update product set 
+		thumbnail_name = $1,
+		thumbnail_path = $2,
+		status = $3,
+		category = $4,
+		tag = $5,
+		template = $6,
+		name = $7,
+		description = $8,
+		price = $9,
+		discount_type = $10,
+		tax_class = $11,
+		vat_amount = $12,
+		sku_number = $13,
+		barcode_number = $14,
+		on_shelf = $15,
+		on_warehouse = $16,
+		allow_backorder = $17,
+		in_physical = $18,
+		meta_title = $19,
+		meta_description = $20,
+		meta_keywords = $21,
+		variations = $22 
+		where id = $23`
+
+	_, err = tx.Exec(
+		query,
+		product.ThumbnailName,
+		product.ThumbnailPath,
+		product.Status,
+		product.Category,
+		product.Tag,
+		product.Template,
+		product.Name,
+		product.Description,
+		product.Price,
+		product.DiscountType,
+		product.TaxClass,
+		product.VATAmount,
+		product.SKUNumber,
+		product.BarcodeNumber,
+		product.OnShelf,
+		product.OnWarehouse,
+		product.AllowBackOrder,
+		product.InPhysical,
+		product.MetaTitle,
+		product.MetaDescription,
+		product.MetaKeywords,
+		variations,
+		product.ID,
+	)
+
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to update product: %v", err)
+	}
+
+	for _, media := range medias {
+		mediaQuery := `insert into media (
+				id, 
+				product_id, 
+				media_filename, 
+				media_file_path, 
+				created_at) values ($1, $2, $3, $4, $5)`
+
+		_, err := tx.Exec(
+			mediaQuery,
+			media.ID,
+			product.ID,
+			media.MediaFilename,
+			media.MediaFilePath,
+			media.CreatedAt,
+		)
+
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to update new media: %v", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %v", err)
+	}
+
 	return nil
 }
 
