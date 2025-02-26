@@ -317,26 +317,28 @@ func (s *PostgresStore) EditProduct(id string, product *Product, variations []by
 		return fmt.Errorf("failed to update product: %v", err)
 	}
 
-	for _, media := range medias {
-		mediaQuery := `insert into media (
+	if len(medias) > 0 {
+		for _, media := range medias {
+			mediaQuery := `insert into media (
 				id, 
 				product_id, 
 				media_filename, 
 				media_file_path, 
 				created_at) values ($1, $2, $3, $4, $5)`
 
-		_, err := tx.Exec(
-			mediaQuery,
-			media.ID,
-			product.ID,
-			media.MediaFilename,
-			media.MediaFilePath,
-			media.CreatedAt,
-		)
+			_, err := tx.Exec(
+				mediaQuery,
+				media.ID,
+				product.ID,
+				media.MediaFilename,
+				media.MediaFilePath,
+				media.CreatedAt,
+			)
 
-		if err != nil {
-			tx.Rollback()
-			return fmt.Errorf("failed to update new media: %v", err)
+			if err != nil {
+				tx.Rollback()
+				return fmt.Errorf("failed to update new media: %v", err)
+			}
 		}
 	}
 

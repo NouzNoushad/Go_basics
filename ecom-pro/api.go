@@ -115,6 +115,10 @@ func (s *APIServer) handleMediaByID(w http.ResponseWriter, r *http.Request) erro
 		return s.handleGetMediaByID(w, r)
 	}
 
+	if r.Method == "DELETE" {
+		return s.handleDeleteMedia(w, r)
+	}
+
 	return fmt.Errorf("method not allowed %s", r.Method)
 }
 
@@ -397,7 +401,7 @@ func (s *APIServer) handleEditProduct(w http.ResponseWriter, r *http.Request) er
 
 	id := getID(r)
 
-    // parse multipart form
+	// parse multipart form
 	err := r.ParseMultipartForm(10 << 20)
 	if err != nil {
 		return badRequestError(w, "Failed to parse form")
@@ -436,7 +440,7 @@ func (s *APIServer) handleEditProduct(w http.ResponseWriter, r *http.Request) er
 		}
 		product.Template = template
 	}
-    
+
 	name := r.FormValue("name")
 	if name != "" {
 		product.Name = name
@@ -565,6 +569,9 @@ func (s *APIServer) handleEditProduct(w http.ResponseWriter, r *http.Request) er
 		if err != nil {
 			return serverError(w, "Failed to copy file")
 		}
+
+		product.ThumbnailName = fileName
+		product.ThumbnailPath = filePath
 	}
 
 	// variation model
@@ -594,46 +601,48 @@ func (s *APIServer) handleEditProduct(w http.ResponseWriter, r *http.Request) er
 
 	// medias
 	files := r.MultipartForm.File["media_files"]
-
 	uploadedMedias := []*Media{}
 
-	mediaDir := "medias"
+	if len(files) > 0 {
 
-	for _, fileHeader := range files {
-		media := new(Media)
-		media.ID = uuid.New().String()
-		media.ProductID = product.ID
-		media.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+		mediaDir := "medias"
 
-		file, err := fileHeader.Open()
-		if err != nil {
-			return serverError(w, "Failed to open file")
+		for _, fileHeader := range files {
+			media := new(Media)
+			media.ID = uuid.New().String()
+			media.ProductID = product.ID
+			media.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+
+			file, err := fileHeader.Open()
+			if err != nil {
+				return serverError(w, "Failed to open file")
+			}
+			defer file.Close()
+
+			// save file
+			fileName := uuid.New().String() + "_" + fileHeader.Filename
+			filePath := filepath.Join(mediaDir, fileName)
+
+			outFile, err := os.Create(filePath)
+			if err != nil {
+				return serverError(w, "Failed to save file")
+			}
+			defer outFile.Close()
+
+			// copy file contents
+			_, err = io.Copy(outFile, file)
+			if err != nil {
+				return serverError(w, "Failed to copy file")
+			}
+
+			media.MediaFilename = fileName
+			media.MediaFilePath = filePath
+
+			uploadedMedias = append(uploadedMedias, media)
 		}
-		defer file.Close()
 
-		// save file
-		fileName := uuid.New().String() + "_" + fileHeader.Filename
-		filePath := filepath.Join(mediaDir, fileName)
-
-		outFile, err := os.Create(filePath)
-		if err != nil {
-			return serverError(w, "Failed to save file")
-		}
-		defer outFile.Close()
-
-		// copy file contents
-		_, err = io.Copy(outFile, file)
-		if err != nil {
-			return serverError(w, "Failed to copy file")
-		}
-
-		media.MediaFilename = fileName
-		media.MediaFilePath = filePath
-
-		uploadedMedias = append(uploadedMedias, media)
+		product.Media = uploadedMedias
 	}
-
-	product.Media = uploadedMedias
 
 	// store
 	if err := s.store.EditProduct(id, product, variationJson, uploadedMedias); err != nil {
@@ -749,6 +758,29 @@ func (s *APIServer) handleGetMediaByID(w http.ResponseWriter, r *http.Request) e
 
 	return WriteJSON(w, http.StatusOK, map[string]interface{}{
 		"data": media,
+	})
+}
+
+// handle delete media
+func (s *APIServer) handleDeleteMedia(w http.ResponseWriter, r *http.Request) error {
+	id := getID(r)
+
+	media, err := s.store.GetMediaByID(id)
+	if err != nil {
+		return err
+	}
+
+	if err := os.Remove(media.MediaFilePath); err != nil {
+		return err
+	}
+
+	if err := s.store.DeleteMedia(id); err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"message": "media deleted",
+		"id":      id,
 	})
 }
 
