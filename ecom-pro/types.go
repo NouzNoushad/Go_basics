@@ -35,3 +35,32 @@ type Product struct {
 	Media           []*Media            `json:"media"`
 	CreatedAt       string              `json:"created_at"`
 }
+
+type Address struct {
+	ID        string `json:"id"`
+	UserID    string `json:"user_id"`
+	FullName  string `json:"full_name"`
+	Phone     string `json:"phone"`
+	Street    string `json:"street"`
+	City      string `json:"city"`
+	State     string `json:"state"`
+	Country   string `json:"country"`
+	ZipCode   string `json:"zip_code"`
+	IsDefault bool   `json:"is_default"`
+	UpdatedAt string `json:"updated_at"`
+	CreatedAt string `json:"created_at"`
+}
+
+type User struct {
+	ID            string     `json:"id"`
+	FullName      string     `json:"full_name"`
+	Email         string     `json:"email"`
+	Phone         string     `json:"phone"`
+	Password_Hash string     `json:"password_hash"`
+	Role          string     `json:"role"`
+	ImageName     string     `json:"image_name"`
+	ImagePath     string     `json:"image_path"`
+	Address       []*Address `json:"addresses"`
+	CreatedAt     string     `json:"created_at"`
+	UpdatedAt     string     `json:"updated_at"`
+}
