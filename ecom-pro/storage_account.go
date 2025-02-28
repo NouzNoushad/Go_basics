@@ -248,3 +248,104 @@ func scanIntoUsers(scanner scannable) (*User, []byte, string, string, error) {
 
 	return user, addressJson, updatedAtString, createdAtString, err
 }
+
+func (s *PostgresStore) CreateAddress(address *Address) error {
+	query := `insert into addresses (
+			id, 
+			user_id,
+			full_name,
+			phone,
+			street,
+			city,
+			state,
+			country,
+			zip_code,
+			is_default,
+			updated_at,
+			created_at) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
+
+	_, err := s.db.Query(
+		query,
+		address.ID,
+		address.UserID,
+		address.FullName,
+		address.Phone,
+		address.Street,
+		address.City,
+		address.State,
+		address.Country,
+		address.ZipCode,
+		address.IsDefault,
+		address.UpdatedAt,
+		address.CreatedAt,
+	)
+
+	return err
+}
+
+func (s *PostgresStore) EditAddress(string, *Address) error {
+	return nil
+}
+
+func (s *PostgresStore) DeleteAddress(string) error {
+	return nil
+}
+
+func (s *PostgresStore) GetAddresses() ([]*Address, error) {
+	query := "select * from addresses"
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	addresses := []*Address{}
+	for rows.Next() {
+		address, updatedAtStr, createdAtStr, err := scanIntoAddress(rows)
+		if err != nil {
+			return nil, err
+		}
+
+		// parse updatedAt
+		address.UpdatedAt, err = parseTime(updatedAtStr)
+		if err != nil {
+			return nil, err
+		}
+
+		// parse createdAt
+		address.CreatedAt, err = parseTime(createdAtStr)
+		if err != nil {
+			return nil, err
+		}
+
+		addresses = append(addresses, address)
+	}
+
+	return addresses, nil
+}
+
+func (s *PostgresStore) GetAddressByID(string) (*Address, error) {
+	return nil, nil
+}
+
+func scanIntoAddress(scanner scannable) (*Address, string, string, error) {
+	address := new(Address)
+	var updatedAtString, createdAtString string
+
+	err := scanner.Scan(
+		&address.ID,
+		&address.UserID,
+		&address.FullName,
+		&address.Phone,
+		&address.Street,
+		&address.City,
+		&address.State,
+		&address.Country,
+		&address.ZipCode,
+		&address.IsDefault,
+		&updatedAtString,
+		&createdAtString,
+	)
+
+	return address, updatedAtString, createdAtString, err
+}

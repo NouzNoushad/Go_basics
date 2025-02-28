@@ -24,6 +24,28 @@ func (s *APIServer) handleAccount(w http.ResponseWriter, r *http.Request) error 
 	return fmt.Errorf("method not allowed %s", r.Method)
 }
 
+// handle request methods (account by id)
+func (s *APIServer) handleAccountByID(w http.ResponseWriter, r *http.Request) error {
+	if r.Method == "GET" {
+		return s.handleGetAccountByID(w, r)
+	}
+
+	return fmt.Errorf("method not allowed %s", r.Method)
+}
+
+// handle request methods (address)
+func (s *APIServer) handleAddress(w http.ResponseWriter, r *http.Request) error {
+	if r.Method == "GET" {
+		return s.handleGetAddresses(w, r)
+	}
+
+	if r.Method == "POST" {
+		return s.handleCreateAddress(w, r)
+	}
+
+	return fmt.Errorf("method not allowed %s", r.Method)
+}
+
 // handle get accounts
 func (s *APIServer) handleGetAccounts(w http.ResponseWriter, _ *http.Request) error {
 	users, err := s.store.GetAccounts()
@@ -180,5 +202,75 @@ func (s *APIServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) 
 	return WriteJSON(w, http.StatusCreated, map[string]interface{}{
 		"message": "User created",
 		"data":    user,
+	})
+}
+
+func (s *APIServer) handleGetAccountByID(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
+
+// address validation
+func addressValidation(address *Address) error {
+
+	// user id
+	if address.UserID == "" {
+		return validationError("User ID is required")
+	}
+
+	return nil
+}
+
+func (s *APIServer) handleCreateAddress(w http.ResponseWriter, r *http.Request) error {
+	address := new(Address)
+
+	// parse multipart form
+	err := r.ParseMultipartForm(10 << 20)
+	if err != nil {
+		return badRequestError(w, "Failed to parse form")
+	}
+
+	address.ID = uuid.New().String()
+	address.UserID = r.FormValue("user_id")
+	address.FullName = r.FormValue("full_name")
+	address.Phone = r.FormValue("phone")
+	address.Street = r.FormValue("street")
+	address.City = r.FormValue("city")
+	address.State = r.FormValue("state")
+	address.Country = r.FormValue("country")
+	address.ZipCode = r.FormValue("zip_code")
+
+	address.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	address.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+
+	address.IsDefault, err = stringToBool(r.FormValue("is_default"))
+	if err != nil {
+		return badRequestError(w, "Invalid is default format")
+	}
+
+	if err := addressValidation(address); err != nil {
+		return badRequestError(w, err.Error())
+	}
+
+	// store
+	if err := s.store.CreateAddress(address); err != nil {
+		return serverError(w, err.Error())
+	}
+
+	// success
+	return WriteJSON(w, http.StatusCreated, map[string]interface{}{
+		"message": "User Address created",
+		"data":    address,
+	})
+}
+
+func (s *APIServer) handleGetAddresses(w http.ResponseWriter, _ *http.Request) error {
+	addresses, err := s.store.GetAddresses()
+	if err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"data":  addresses,
+		"items": fmt.Sprintf("%d items", len(addresses)),
 	})
 }

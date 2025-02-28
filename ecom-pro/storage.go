@@ -32,6 +32,12 @@ type Storage interface {
 	GetAccounts() ([]*User, error)
 	GetAccountByID(string) (*User, error)
 	GetAccountByEmail(string) (*User, error)
+	// address
+	CreateAddress(*Address) error
+	EditAddress(string, *Address) error
+	DeleteAddress(string) error
+	GetAddresses() ([]*Address, error)
+	GetAddressByID(string) (*Address, error)
 }
 
 // Postgresql store

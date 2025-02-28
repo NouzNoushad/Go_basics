@@ -233,7 +233,7 @@ func (s *APIServer) handleAddProduct(w http.ResponseWriter, r *http.Request) err
 
 	// validation
 	if err := productValidation(product); err != nil {
-		return WriteJSON(w, http.StatusBadRequest, ApiError{Error: err.Error()})
+		return badRequestError(w, err.Error())
 	}
 
 	// create file
@@ -253,7 +253,7 @@ func (s *APIServer) handleAddProduct(w http.ResponseWriter, r *http.Request) err
 	// convert attr map to json
 	variationJson, err := json.Marshal(attributes)
 	if err != nil {
-		return WriteJSON(w, http.StatusInternalServerError, err.Error())
+		return serverError(w, err.Error())
 	}
 
 	// medias
@@ -264,7 +264,7 @@ func (s *APIServer) handleAddProduct(w http.ResponseWriter, r *http.Request) err
 	// create media dir
 	mediaDir := "medias"
 	if err := os.MkdirAll(mediaDir, os.ModePerm); err != nil {
-		return WriteJSON(w, http.StatusInternalServerError, "Failed to create media directory")
+		return serverError(w, "Failed to create media directory")
 	}
 
 	for _, fileHeader := range files {
@@ -275,7 +275,7 @@ func (s *APIServer) handleAddProduct(w http.ResponseWriter, r *http.Request) err
 
 		file, err := fileHeader.Open()
 		if err != nil {
-			return WriteJSON(w, http.StatusInternalServerError, "Failed to open file")
+			return serverError(w, "Failed to open file")
 		}
 		defer file.Close()
 
@@ -285,14 +285,14 @@ func (s *APIServer) handleAddProduct(w http.ResponseWriter, r *http.Request) err
 
 		outFile, err := os.Create(filePath)
 		if err != nil {
-			return WriteJSON(w, http.StatusInternalServerError, "Failed to save file")
+			return serverError(w, "Failed to save file")
 		}
 		defer outFile.Close()
 
 		// copy file contents
 		_, err = io.Copy(outFile, file)
 		if err != nil {
-			return WriteJSON(w, http.StatusInternalServerError, "Failed to copy file")
+			return serverError(w, "Failed to copy file")
 		}
 
 		media.MediaFilename = fileName

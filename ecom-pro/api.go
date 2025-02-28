@@ -52,6 +52,8 @@ func (s *APIServer) Run() {
 	router.HandleFunc("/media", makeHandleFunc(s.handleMedia))
 	router.HandleFunc("/media/{id}", makeHandleFunc(s.handleMediaByID))
     router.HandleFunc("/user", makeHandleFunc(s.handleAccount))
+    router.HandleFunc("/user/{id}", makeHandleFunc(s.handleAccountByID))
+    router.HandleFunc("/address", makeHandleFunc(s.handleAddress))
 
 	Static(router, "/uploads/", "./uploads")
 	Static(router, "/medias/", "./medias")
