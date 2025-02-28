@@ -64,3 +64,7 @@ type User struct {
 	CreatedAt     string     `json:"created_at"`
 	UpdatedAt     string     `json:"updated_at"`
 }
+
+type LoginResponse struct {
+	Token string `json:"token"`
+}

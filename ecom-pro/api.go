@@ -2,10 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 
+	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type APIServer struct {
@@ -51,9 +55,10 @@ func (s *APIServer) Run() {
 	router.HandleFunc("/product/{id}", makeHandleFunc(s.handleProductByID))
 	router.HandleFunc("/media", makeHandleFunc(s.handleMedia))
 	router.HandleFunc("/media/{id}", makeHandleFunc(s.handleMediaByID))
-    router.HandleFunc("/user", makeHandleFunc(s.handleAccount))
-    router.HandleFunc("/user/{id}", makeHandleFunc(s.handleAccountByID))
-    router.HandleFunc("/address", makeHandleFunc(s.handleAddress))
+	router.HandleFunc("/account", makeHandleFunc(s.handleAccount))
+	router.HandleFunc("/address", makeHandleFunc(s.handleAddress))
+	router.HandleFunc("/login", makeHandleFunc(s.handleLogin))
+    router.HandleFunc("/account/{id}", withJWTAuth(makeHandleFunc(s.handleAccountByID), s.store))
 
 	Static(router, "/uploads/", "./uploads")
 	Static(router, "/medias/", "./medias")
@@ -127,4 +132,74 @@ func makeHandleFunc(f apiFunc) http.HandlerFunc {
 			WriteJSON(w, http.StatusBadRequest, ApiError{Error: err.Error()})
 		}
 	}
+}
+
+func createJWT(user *User) (string, error) {
+	claims := &jwt.MapClaims{
+		"expiresAt": 15000,
+		"email":     user.Email,
+	}
+
+	secret := os.Getenv("SECRET_KEY")
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	return token.SignedString([]byte(secret))
+}
+
+func permissionDenied(w http.ResponseWriter) {
+	WriteJSON(w, http.StatusForbidden, ApiError{Error: "permission denied"})
+}
+
+func withJWTAuth(handlerFunc http.HandlerFunc, s Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("calling JWT auth middleware")
+
+		tokenString := r.Header.Get("x-jwt-token")
+		token, err := validateJWT(tokenString)
+		if err != nil {
+			permissionDenied(w)
+			return
+		}
+
+		if !token.Valid {
+			permissionDenied(w)
+			return
+		}
+
+		userID := getID(r)
+
+		user, err := s.GetAccountByID(userID)
+		if err != nil {
+			permissionDenied(w)
+			return
+		}
+
+		claims := token.Claims.(jwt.MapClaims)
+		if user.Email != claims["email"] {
+			permissionDenied(w)
+			return
+		}
+
+		handlerFunc(w, r)
+	}
+}
+
+func validateJWT(tokenString string) (*jwt.Token, error) {
+	secret := os.Getenv("SECRET_KEY")
+
+	return jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
+
+		return []byte(secret), nil
+	})
+}
+
+func EncryptPassword(pw string) ([]byte, error) {
+	return bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
+}
+
+func (a *User) ValidPassword(pw string) bool {
+	return bcrypt.CompareHashAndPassword([]byte(a.Password_Hash), []byte(pw)) == nil
 }

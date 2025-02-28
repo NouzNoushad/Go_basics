@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 )
@@ -219,12 +220,121 @@ func (s *PostgresStore) GetAccounts() ([]*User, error) {
 	return users, nil
 }
 
+func (s *PostgresStore) userAccountRow(query string, id string) (*User, error) {
+	row := s.db.QueryRow(query, id)
+
+	user, addressJson, updatedAtString, createdAtString, err := scanIntoUsers(row)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("user with id [%s] not found", id)
+		}
+		return nil, err
+	}
+
+	// parse created_at
+	user.CreatedAt, err = parseTime(createdAtString)
+	if err != nil {
+		return nil, err
+	}
+
+	// parse updated_at
+	user.UpdatedAt, err = parseTime(updatedAtString)
+	if err != nil {
+		return nil, err
+	}
+
+	// unmarshal address
+	if err := json.Unmarshal(addressJson, &user.Address); err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
 func (s *PostgresStore) GetAccountByID(id string) (*User, error) {
-	return nil, nil
+	query := `
+		select
+			u.id,
+			u.full_name,
+			u.email,
+			u.phone,
+			u.password_hash,
+			u.role,
+			u.image_name,
+			u.image_path,
+			to_char(u.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS updated_at,
+			to_char(u.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at,
+
+			coalesce(jsonb_agg(distinct jsonb_build_object(
+				'id', a.id,
+				'user_id', a.user_id,
+				'full_name', a.full_name,
+				'phone', a.phone,
+				'street', a.street,
+				'city', a.city,
+				'state', a.state,
+				'country', a.country,
+				'zip_code', a.zip_code,
+				'is_default', a.is_default,
+				'updated_at', to_char(a.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
+				'created_at', to_char(a.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+			)) filter (where a.id is not null), '[]'::jsonb) as addresses
+		
+		from users u
+		left join addresses a on u.id = a.user_id
+		where u.id = $1
+		group by u.id
+	`
+
+	user, err := s.userAccountRow(query, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
 }
 
 func (s *PostgresStore) GetAccountByEmail(email string) (*User, error) {
-	return nil, nil
+	query := `
+		select
+			u.id,
+			u.full_name,
+			u.email,
+			u.phone,
+			u.password_hash,
+			u.role,
+			u.image_name,
+			u.image_path,
+			to_char(u.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS updated_at,
+			to_char(u.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at,
+
+			coalesce(jsonb_agg(distinct jsonb_build_object(
+				'id', a.id,
+				'user_id', a.user_id,
+				'full_name', a.full_name,
+				'phone', a.phone,
+				'street', a.street,
+				'city', a.city,
+				'state', a.state,
+				'country', a.country,
+				'zip_code', a.zip_code,
+				'is_default', a.is_default,
+				'updated_at', to_char(a.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
+				'created_at', to_char(a.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+			)) filter (where a.id is not null), '[]'::jsonb) as addresses
+		
+		from users u
+		left join addresses a on u.id = a.user_id
+		where u.email = $1
+		group by u.id
+	`
+
+	user, err := s.userAccountRow(query, email)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
 }
 
 func scanIntoUsers(scanner scannable) (*User, []byte, string, string, error) {

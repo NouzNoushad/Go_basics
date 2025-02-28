@@ -8,8 +8,16 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
 )
+
+// handle request methods (login)
+func (s *APIServer) handleLogin(w http.ResponseWriter, r *http.Request) error {
+	if r.Method == "POST" {
+		return s.handleUserLogin(w, r)
+	}
+
+	return fmt.Errorf("method not allowed %s", r.Method)
+}
 
 // handle request methods (account)
 func (s *APIServer) handleAccount(w http.ResponseWriter, r *http.Request) error {
@@ -28,6 +36,10 @@ func (s *APIServer) handleAccount(w http.ResponseWriter, r *http.Request) error 
 func (s *APIServer) handleAccountByID(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "GET" {
 		return s.handleGetAccountByID(w, r)
+	}
+
+	if r.Method == "DELETE" {
+		return s.handleDeleteAccount(w, r)
 	}
 
 	return fmt.Errorf("method not allowed %s", r.Method)
@@ -118,8 +130,47 @@ func accountValidation(user *User, password string) error {
 	return nil
 }
 
-func EncryptPassword(pw string) ([]byte, error) {
-	return bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
+// handle user login
+func (s *APIServer) handleUserLogin(w http.ResponseWriter, r *http.Request) error {
+
+	// parse multipart form
+	err := r.ParseMultipartForm(10 << 20)
+	if err != nil {
+		return badRequestError(w, "Failed to parse form")
+	}
+
+	email := r.FormValue("email")
+	password := r.FormValue("password")
+
+	if email == "" {
+		return badRequestError(w, "Email is required")
+	}
+	if !isValidEmail(email) {
+		return badRequestError(w, "Invalid email")
+	}
+
+	acc, err := s.store.GetAccountByEmail(email)
+	if err != nil {
+		return err
+	}
+
+	if !acc.ValidPassword(password) {
+		return fmt.Errorf("not authenticated")
+	}
+
+	token, err := createJWT(acc)
+	if err != nil {
+		return err
+	}
+
+	resp := LoginResponse{
+		Token: token,
+	}
+
+	return WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"message": "Login success",
+		"data":    resp,
+	})
 }
 
 // handle create account
@@ -206,6 +257,20 @@ func (s *APIServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *APIServer) handleGetAccountByID(w http.ResponseWriter, r *http.Request) error {
+	id := getID(r)
+
+	account, err := s.store.GetAccountByID(id)
+	if err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"data": account,
+	})
+}
+
+// handle delete account
+func (s *APIServer) handleDeleteAccount(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
