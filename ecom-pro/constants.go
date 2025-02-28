@@ -63,3 +63,14 @@ func isValidTaxClass(taxClass string) bool {
 	}
 	return false
 }
+
+// valid role
+func isValidRole(role string) bool {
+	switch role {
+	case "customer",
+		"admin",
+		"seller":
+		return true
+	}
+	return false
+}

@@ -1,8 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
+	"time"
+
+	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // handle request methods (account)
@@ -19,11 +25,160 @@ func (s *APIServer) handleAccount(w http.ResponseWriter, r *http.Request) error 
 }
 
 // handle get accounts
-func (s *APIServer) handleGetAccounts(w http.ResponseWriter, r *http.Request) error {
+func (s *APIServer) handleGetAccounts(w http.ResponseWriter, _ *http.Request) error {
+	users, err := s.store.GetAccounts()
+	if err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"data":  users,
+		"items": fmt.Sprintf("%d items", len(users)),
+	})
+}
+
+// validate password
+func isValidPassword(password string) bool {
+	// password length
+	if len(password) < 8 {
+		return false
+	}
+
+	// check if password contains at least one uppercase letter
+	hasUpperCase := regexp.MustCompile(`[A-Z]`).MatchString(password)
+	if !hasUpperCase {
+		return false
+	}
+
+	// check if password contains atleast one number
+	hasNumber := regexp.MustCompile(`[0-9]`).MatchString(password)
+	if !hasNumber {
+		return false
+	}
+
+	// check if password contains atleast one special character
+	hasSpecialCharacter := regexp.MustCompile(`[!@#$^&*(),.?":{}|<>]`).MatchString(password)
+	return hasSpecialCharacter
+}
+
+func isValidEmail(email string) bool {
+	emailRegex := `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
+	return regexp.MustCompile(emailRegex).MatchString(email)
+}
+
+// account validation
+func accountValidation(user *User, password string) error {
+
+	// name
+	if user.FullName == "" {
+		return validationError("Name is required")
+	}
+
+	// email
+	if user.Email == "" {
+		return validationError("Email is required")
+	}
+
+	if !isValidEmail(user.Email) {
+		return validationError("Invalid email")
+	}
+
+	// discount_type
+	if !isValidPassword(password) {
+		return validationError("Password must be at least 8 characters long, contain at least one uppercase letter, one number and one special character")
+	}
+
+	// role
+	if !isValidRole(user.Role) {
+		return validationError("Invalid role")
+	}
+
 	return nil
+}
+
+func EncryptPassword(pw string) ([]byte, error) {
+	return bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
 }
 
 // handle create account
 func (s *APIServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) error {
-	return nil
+	user := new(User)
+
+	// parse multipart form
+	err := r.ParseMultipartForm(10 << 20)
+	if err != nil {
+		return badRequestError(w, "Failed to parse form")
+	}
+
+	user.ID = uuid.New().String()
+	user.FullName = r.FormValue("full_name")
+	user.Email = r.FormValue("email")
+	user.Phone = r.FormValue("phone")
+	user.Role = r.FormValue("role")
+
+	user.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	user.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+
+	password := r.FormValue("password")
+
+	// validation
+	if err := accountValidation(user, password); err != nil {
+		return badRequestError(w, err.Error())
+	}
+
+	// hash password
+	encpw, err := EncryptPassword(password)
+	if err != nil {
+		return serverError(w, "Error hashing password")
+	}
+
+	user.Password_Hash = string(encpw)
+
+	// create file
+	user.ImageName, user.ImagePath, err = createFile(r, "image", "users")
+	if err != nil {
+		return serverError(w, err.Error())
+	}
+
+	addressesData := r.MultipartForm.Value["addresses"]
+	addresses := []*Address{}
+
+	if len(addressesData) > 0 {
+		err := json.Unmarshal([]byte(addressesData[0]), &addresses)
+		if err != nil {
+			return serverError(w, "failed to parse the json")
+		}
+
+		for _, address := range addresses {
+			newAddress := Address{
+				ID:        uuid.New().String(),
+				UserID:    user.ID,
+				FullName:  address.FullName,
+				Phone:     address.Phone,
+				Street:    address.Street,
+				City:      address.City,
+				State:     address.State,
+				Country:   address.Country,
+				ZipCode:   address.ZipCode,
+				IsDefault: address.IsDefault,
+				UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+				CreatedAt: time.Now().UTC().Format(time.RFC3339),
+			}
+
+			addresses = append(addresses, &newAddress)
+		}
+	}
+
+	user.Address = addresses
+
+	// store
+	if err := s.store.CreateAccount(user, addresses); err != nil {
+		return serverError(w, err.Error())
+	}
+
+	// success
+	return WriteJSON(w, http.StatusCreated, map[string]interface{}{
+		"message": "User created",
+		"data":    user,
+	})
 }
