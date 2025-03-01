@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"regexp"
 	"time"
 
@@ -53,6 +54,19 @@ func (s *APIServer) handleAddress(w http.ResponseWriter, r *http.Request) error 
 
 	if r.Method == "POST" {
 		return s.handleCreateAddress(w, r)
+	}
+
+	return fmt.Errorf("method not allowed %s", r.Method)
+}
+
+// handle request methods (address by id)
+func (s *APIServer) handleAddressByID(w http.ResponseWriter, r *http.Request) error {
+	if r.Method == "GET" {
+		return s.handleGetAddressByID(w, r)
+	}
+
+	if r.Method == "DELETE" {
+		return s.handleDeleteAddress(w, r)
 	}
 
 	return fmt.Errorf("method not allowed %s", r.Method)
@@ -271,7 +285,26 @@ func (s *APIServer) handleGetAccountByID(w http.ResponseWriter, r *http.Request)
 
 // handle delete account
 func (s *APIServer) handleDeleteAccount(w http.ResponseWriter, r *http.Request) error {
-	return nil
+	id := getID(r)
+
+	account, err := s.store.GetAccountByID(id)
+	if err != nil {
+		return err
+	}
+
+	// remove image from users
+	if err := os.Remove(account.ImagePath); err != nil {
+		return err
+	}
+
+	if err := s.store.DeleteAccount(id); err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"message": fmt.Sprintf("User account with email [%s] is deleted", account.Email),
+		"id":      id,
+	})
 }
 
 // address validation
@@ -337,5 +370,31 @@ func (s *APIServer) handleGetAddresses(w http.ResponseWriter, _ *http.Request) e
 	return WriteJSON(w, http.StatusOK, map[string]interface{}{
 		"data":  addresses,
 		"items": fmt.Sprintf("%d items", len(addresses)),
+	})
+}
+
+func (s *APIServer) handleGetAddressByID(w http.ResponseWriter, r *http.Request) error {
+	id := getID(r)
+
+	address, err := s.store.GetAddressByID(id)
+	if err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"data": address,
+	})
+}
+
+func (s *APIServer) handleDeleteAddress(w http.ResponseWriter, r *http.Request) error {
+	id := getID(r)
+
+	if err := s.store.DeleteAddress(id); err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"message": "address deleted",
+		"id":      id,
 	})
 }

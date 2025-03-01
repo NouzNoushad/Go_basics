@@ -47,6 +47,13 @@ func Static(r *mux.Router, pathPrefix string, dir string) {
 	r.PathPrefix(pathPrefix).Handler(http.StripPrefix(pathPrefix, http.FileServer(http.Dir(dir))))
 }
 
+type FuncType int
+
+const (
+	UserAccount FuncType = iota
+	UserAddress
+)
+
 // router
 func (s *APIServer) Run() {
 	router := mux.NewRouter()
@@ -58,7 +65,8 @@ func (s *APIServer) Run() {
 	router.HandleFunc("/account", makeHandleFunc(s.handleAccount))
 	router.HandleFunc("/address", makeHandleFunc(s.handleAddress))
 	router.HandleFunc("/login", makeHandleFunc(s.handleLogin))
-    router.HandleFunc("/account/{id}", withJWTAuth(makeHandleFunc(s.handleAccountByID), s.store))
+	router.HandleFunc("/account/{id}", withJWTAuth(makeHandleFunc(s.handleAccountByID), s.store, UserAccount))
+	router.HandleFunc("/address/{id}", withJWTAuth(makeHandleFunc(s.handleAddressByID), s.store, UserAddress))
 
 	Static(router, "/uploads/", "./uploads")
 	Static(router, "/medias/", "./medias")
@@ -150,7 +158,7 @@ func permissionDenied(w http.ResponseWriter) {
 	WriteJSON(w, http.StatusForbidden, ApiError{Error: "permission denied"})
 }
 
-func withJWTAuth(handlerFunc http.HandlerFunc, s Storage) http.HandlerFunc {
+func withJWTAuth(handlerFunc http.HandlerFunc, s Storage, f FuncType) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("calling JWT auth middleware")
 
@@ -166,7 +174,21 @@ func withJWTAuth(handlerFunc http.HandlerFunc, s Storage) http.HandlerFunc {
 			return
 		}
 
-		userID := getID(r)
+		id := getID(r)
+
+		var userID string
+
+		if f == UserAddress {
+			address, err := s.GetAddressByID(id)
+			if err != nil {
+				permissionDenied(w)
+				return
+			}
+
+			userID = address.UserID
+		} else {
+			userID = id
+		}
 
 		user, err := s.GetAccountByID(userID)
 		if err != nil {

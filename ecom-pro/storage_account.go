@@ -145,7 +145,10 @@ func (s *PostgresStore) EditAccount(id string, user *User) error {
 }
 
 func (s *PostgresStore) DeleteAccount(id string) error {
-	return nil
+	query := "delete from users where id = $1"
+	_, err := s.db.Query(query, id)
+
+	return err
 }
 
 func (s *PostgresStore) GetAccounts() ([]*User, error) {
@@ -397,8 +400,11 @@ func (s *PostgresStore) EditAddress(string, *Address) error {
 	return nil
 }
 
-func (s *PostgresStore) DeleteAddress(string) error {
-	return nil
+func (s *PostgresStore) DeleteAddress(id string) error {
+	query := "delete from addresses where id = $1"
+	_, err := s.db.Query(query, id)
+
+	return err
 }
 
 func (s *PostgresStore) GetAddresses() ([]*Address, error) {
@@ -434,8 +440,31 @@ func (s *PostgresStore) GetAddresses() ([]*Address, error) {
 	return addresses, nil
 }
 
-func (s *PostgresStore) GetAddressByID(string) (*Address, error) {
-	return nil, nil
+func (s *PostgresStore) GetAddressByID(id string) (*Address, error) {
+	query := "select * from addresses where id = $1"
+	row := s.db.QueryRow(query, id)
+
+	address, updatedAtStr, createdAtStr, err := scanIntoAddress(row)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("media with id [%s] not found", id)
+		}
+		return nil, err
+	}
+
+	// parse updatedAt
+	address.UpdatedAt, err = parseTime(updatedAtStr)
+	if err != nil {
+		return nil, err
+	}
+
+	// parse createdAt
+	address.CreatedAt, err = parseTime(createdAtStr)
+	if err != nil {
+		return nil, err
+	}
+
+	return address, nil
 }
 
 func scanIntoAddress(scanner scannable) (*Address, string, string, error) {
